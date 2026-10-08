@@ -71,6 +71,8 @@ Expose required release-by date based on pickup and delivery requirements. Delay
 
 ### Operations
 
+The main workspace preserves the spreadsheet schedule, with a collapsible open-orders panel and drag-to-schedule interaction. See [Operations scheduler and run estimates](operations-scheduler-and-run-estimates.md) for quantity coverage, SKU/line duration estimates and capacity previews.
+
 Use a line/shift/date schedule with linked run cards. Compact cards show description, FG/WP, customer PO reference, quantity, readiness and a separate customer-date alert. Expanded cards show SO lines, WOs, component hierarchy, lot allocations and evidence.
 
 Multiple date/shift appearances of a run share its identity and do not create duplicate demand. A run may supply several order lines; an order line may be covered by several runs or released stock.
