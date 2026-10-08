@@ -76,6 +76,37 @@ Illustrative example only: 60,000 units at 10,000 units per available production
 
 When reliable history is unavailable, show an approved standard rate or planner-entered duration with its source and reason. Otherwise show duration as unknown. AI must not invent throughput. New actuals may suggest revised estimates, but cannot silently move confirmed runs.
 
+## Predicted units from selected shifts and normal OEE
+
+Clarified user direction, 2026-10-08: the interaction works in both directions. Entering quantity can suggest shifts; selecting shifts predicts achievable good units using the applicable SKU/line timing and normal OEE assumptions. Update this prediction as the planner adds or removes slots.
+
+Display together in the placement preview and run card:
+
+- Total open order quantity and required delivery dates.
+- Target quantity allocated to this particular run or delivery installment.
+- Selected shifts and available hours.
+- Predicted good units from those slots, with the rate/OEE basis and uncertainty.
+- Predicted shortfall against the run target.
+- Other run/stock coverage and the order balance still needing coverage.
+
+Normal OEE must have a defined scope, time basis, source, history window and version appropriate to the SKU/line/operation. The calculation design must reconcile ideal rate, OEE, scheduled production time, setup and planned stops on a consistent basis. Apply losses once: if an empirical good-output rate already includes the same effectiveness losses, do not multiply it by OEE again. Missing OEE or rate data produces an explicit approved fallback or unknown prediction. Validate these inputs before operational use; no live OEE feed is assumed.
+
+Illustrative UI quantities only: order open quantity 60,000; this run target 60,000; selected shifts predict 30,000; capacity shortfall 30,000. If the planner intentionally changes this run's target to 30,000, its capacity shortfall clears, but the other 30,000 remains outstanding until linked to another run or eligible stock. The example is not a measured throughput claim.
+
+### Advisory warnings and intentional splits
+
+Insufficient predicted output is an advisory warning, not a requirement to extend the run. The planner may acknowledge and proceed because production is split across runs, order lines or separate deliveries, or because they expect a different actual rate. Offer actions to adjust the run target, link another run, plan a later installment, add shifts, or proceed with a reason.
+
+Acknowledging a warning does not change the calculated prediction, declare the order fully covered or erase the outstanding balance. Show the acknowledged risk and reason, with who/when in the revision log. Re-evaluate it when quantity, shifts, rate/OEE or coverage changes; a previous acknowledgement must not silently cover a different shortfall.
+
+Distinguish intended coverage from predicted coverage: allocating 60,000 units to a run predicted to produce 30,000 does not make the other 30,000 disappear. At order level, aggregate non-duplicated predicted contributions capped by each run's assigned quantity, plus eligible allocated stock, and show the difference from intended coverage. Multi-order runs cannot allocate their forecast output more than once.
+
+Keep split runs and delivery installments linked to the originating SO line/customer PO with explicit quantities and dates. If actual ERP orders or lines are split, retain parent/child lineage and reconcile the original remaining balance so demand is not duplicated. A scheduling gesture alone does not create new ERP sales orders.
+
+Assess customer-date risk for each installment and for the full remaining order. “Half now, half later” is an intentional plan, but a later installment may still be late against the requested/agreed date. Record any separately authorized customer commitment change; accepting a capacity warning does not change that commitment.
+
+Acceptance: selecting fewer shifts reduces predicted output while leaving order quantity intact; a planner can save an acknowledged shortfall; splitting a 60,000-unit requirement into two 30,000-unit runs preserves exactly 60,000 total demand; predicted coverage remains distinct from assigned targets; and a late second delivery stays visible after the first delivery is covered.
+
 ## Planner timing overrides
 
 Operations can keep the quantity against an order unchanged while adjusting planned start, duration, working shifts or finish. Historical runtime is a recommendation, not a locked duration. Show the system estimate and planner's chosen timing side by side, including their difference.
