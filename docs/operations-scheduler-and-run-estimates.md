@@ -142,6 +142,43 @@ Production completion and customer delivery remain separate dates. Finished-good
 - Quarterly reports preserve the original baseline and include unfinished overdue work, missing actuals and later corrections explicitly.
 - Planner overrides never enter historical throughput as measured actuals.
 
+## Future phase: MasterControl execution visibility and scheduling intelligence
+
+Requested direction, captured 2026-10-08. This is a future integration and intelligence feature, not a prerequisite for the initial spreadsheet scheduler. MasterControl connectivity, accessible fields and update frequency have not been verified.
+
+### Work-order drill-down
+
+Opening a scheduled production card reveals its individual linked work orders. Opening a work order shows its linked MasterControl execution record and current progress: applicable operation/step, source status, completed and pending steps, blockers/holds, quantities and actual timestamps where the source provides them. Provide an authorized link to the exact record and show when the information was last refreshed.
+
+Preserve explicit mappings between schedule run, ERP WO, product/revision, lot and MasterControl record/version. Support multiple work orders per run and multiple applicable records or steps per WO without assuming one-to-one relationships. Display unmatched records for reconciliation rather than guessing from product descriptions.
+
+Keep physical production progress, electronic record completion, review and quality disposition distinct. A record awaiting signatures may describe physically completed production; a completed step does not establish final lot release. Parallel steps should remain visible rather than being forced into a single misleading current-step label. Do not equate the percentage of steps completed with percentage of time remaining.
+
+### Execution data for the scheduling brain
+
+Retain source event history, effective and received timestamps, record/template revisions, step transitions, measured runtime, good output, pauses, holds, rework and correction history where available. Preserve the original source meaning and agreed normalized meaning. Status snapshots alone cannot establish exact transition times; inferred intervals must be labeled as estimates.
+
+Use validated execution history to support suggestions such as:
+
+- “The last comparable run of this SKU on this line took X production hours.”
+- “Across N comparable runs, the typical duration was X, with a range of Y–Z.”
+- “This work order has reached this step; estimated remaining work places completion at this time.”
+- “Recent comparable runs suggest allowing another shift on the next schedule.”
+
+These are proposed output formats, not actual observations. Compare quantity, line, operation, product/template revision and applicable conditions. Separate processing time from waiting for materials, QA, documentation or equipment so an unusual hold does not automatically become the normal production rate.
+
+Each recommendation must expose its supporting runs, sample size, assumptions, uncertainty and data freshness. Preserve its prediction timestamp, input versions and subsequent actual outcome for later accuracy review. Missing or stale source data reduces confidence and stays visible.
+
+Planners retain control over adopting suggestions and overriding timing. Accepted suggestions become plan revisions with a reason and provenance. The integration must not automatically reschedule confirmed work, change customer commitments, complete MasterControl steps or authorize quality release.
+
+### What to preserve now
+
+Establish stable run/WO/order identities, versioned plan estimates, timing overrides with reasons, and separate actual measurements in the initial design. Leave explicit external-record mapping support for the future integration. Actuals can initially come from verified imports or authorized manual entry, labeled by source; do not imply MasterControl is already connected.
+
+Before this phase is implemented, validate access methods, source permissions, record/WO mapping, available events versus snapshots, status semantics, refresh cadence and historical coverage. Start with read-only visibility and validated history, then introduce evidence-backed recommendations.
+
+Future-phase acceptance: each WO opens the correct source record; stale/unmatched data is obvious; record review cannot masquerade as production runtime or quality release; source corrections preserve history; and a recommendation cannot alter the plan until adopted by an authorized planner.
+
 ## Details to validate before implementation
 
 Confirm historical actuals sources; minimum sample size and comparison window; runtime and downtime definitions; shift calendars; interruption rules; setup/changeover policy; order coverage rules; provisional-run-to-WO reconciliation; reason taxonomy; baseline freeze policy; reporting cohorts; and audit retention/access responsibilities. These are implementation decisions, not additional approved functionality.
