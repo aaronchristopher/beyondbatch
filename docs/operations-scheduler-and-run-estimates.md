@@ -24,6 +24,38 @@ A multi-day run occupies the appropriate cells under one stable run identity. Cl
 
 Do not silently double-book a line or move other runs. An incompatible SKU/operation/line combination cannot be confirmed. Material shortages can remain visible on a deliberately planned run; scheduling never bypasses quality or execution prerequisites. Capture actor, previous and new placement, quantity and estimate version, with concurrency checks against newer edits.
 
+## Explicit shift slots and top-level warnings
+
+Clarified user direction, 2026-10-08: dates remain rows and production lines remain column groups. Within each line/date intersection, show two independently selectable, side-by-side slots: **1st shift on the left; 2nd shift on the right**. Keep these labels visible in the headers. A multi-day placement does not imply both shifts are occupied.
+
+The planner drops an open order into its first date/shift slot, then extends it across the intended dates and shifts. Dragging down within the 1st-shift subcolumn selects only 1st shift on those dates; it must not automatically fill intervening 2nd shifts. Support explicit selection of both shifts, 2nd shift only, and individual additions/removals for mixed patterns. Provide equivalent keyboard controls.
+
+Illustrative placement on one line:
+
+| Date | 1st shift — left | 2nd shift — right |
+|---|---|---|
+| Monday | Run A | Available |
+| Tuesday | Run A | Available |
+| Wednesday | Run A | Available |
+
+This represents three selected shifts spread across three days, not six shifts. All three placements reference one run and one planned quantity. Unselected slots remain available subject to real equipment occupancy, cleaning/changeover and interruption constraints. If the process cannot pause or leaves the line occupied overnight, show the resulting restriction rather than assuming another product can use that gap.
+
+Store the plan as explicit line/date/shift allocations, including any partial-shift timing. Preserve the selected shift pattern when moving or extending a run; preview exceptions if a destination slot is unavailable. Never reduce the plan to only a continuous start/end range, because that would lose which shifts were selected.
+
+Show the selected shift count, available production hours, planned quantity, historical estimate and projected finish as the planner drags or resizes. If the selected slots provide less capacity than the estimate requires, warn clearly. The planner can adopt a documented timing override; a shorter visual placement does not prove faster production. Confirmed allocation changes enter the existing revision log with before/after slots and reason.
+
+### Potential lateness at a glance
+
+The open-orders panel and schedule placements both expose customer-date risk. Recalculate during placement previews and after confirmed timing, quantity, shift or dependency changes. Explain the warning with the requested/agreed date, projected delivery date, estimated gap and contributing constraints. Keep delivery risk separate from material-readiness color.
+
+For unscheduled or partly covered orders, distinguish “unscheduled / delivery at risk” from a calculated late forecast. Where enough data exists, show earliest feasible coverage based on the current schedule, compatible capacity and known dependencies. Missing capacity, duration or shipping inputs produce an explicit unknown forecast, not an invented delivery date.
+
+For scheduled quantities, calculate finish from the actual selected shifts, then include remaining FG quality release and shipping time. A late-delivery warning can coexist with green material readiness. Identify the affected quantity when an order has partial coverage or multiple planned deliveries.
+
+### Drill-down hierarchy
+
+Keep the top-level spreadsheet readable, with compact order/run identification and warnings. Clicking any occupied shift opens the same production card: description, FG, customer PO, SO lines, quantity, selected shifts, component readiness and revision history. From there, open individual work orders and, in the future MasterControl phase, the linked execution record and step status. Users should not have to open every card to find potentially late orders.
+
 ## Estimate duration by SKU and line
 
 Use historical performance for the specific SKU, line and operation. A SKU may run at different speeds on different lines. Plain average batch duration is insufficient when historical quantities differ.
@@ -178,6 +210,15 @@ Establish stable run/WO/order identities, versioned plan estimates, timing overr
 Before this phase is implemented, validate access methods, source permissions, record/WO mapping, available events versus snapshots, status semantics, refresh cadence and historical coverage. Start with read-only visibility and validated history, then introduce evidence-backed recommendations.
 
 Future-phase acceptance: each WO opens the correct source record; stale/unmatched data is obvious; record review cannot masquerade as production runtime or quality release; source corrections preserve history; and a recommendation cannot alter the plan until adopted by an authorized planner.
+
+## Shift-selection acceptance scenarios
+
+- Extending a run down three 1st-shift slots books exactly those three slots and leaves 2nd shift unselected.
+- Selecting both shifts for three days books six slots, subject to the actual calendar.
+- Removing Tuesday 2nd shift preserves the other selected slots and recalculates the forecast.
+- Resizing or moving a run preserves its identity, quantity coverage and explicit shift pattern, with revision history.
+- Insufficient selected capacity triggers an estimate warning and requires a reason for a timing override.
+- Potential customer lateness is visible in the order panel and grid before opening the card; unknown forecasts stay distinct from known late forecasts.
 
 ## Details to validate before implementation
 
