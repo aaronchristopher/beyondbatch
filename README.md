@@ -15,6 +15,7 @@ The production schedule and component overview are two views of the same require
 
 ## Documentation
 
+- [Operations scheduler and run estimates](docs/operations-scheduler-and-run-estimates.md)
 - [Department workflows and quality module](docs/department-workflows-and-quality.md)
 - [ADR 0007: Department workflows and lot-level quality](docs/decisions/0007-department-workflows-and-lot-quality.md)
 
