@@ -44,6 +44,60 @@ Illustrative example only: 60,000 units at 10,000 units per available production
 
 When reliable history is unavailable, show an approved standard rate or planner-entered duration with its source and reason. Otherwise show duration as unknown. AI must not invent throughput. New actuals may suggest revised estimates, but cannot silently move confirmed runs.
 
+## Planner timing overrides
+
+Operations can keep the quantity against an order unchanged while adjusting planned start, duration, working shifts or finish. Historical runtime is a recommendation, not a locked duration. Show the system estimate and planner's chosen timing side by side, including their difference.
+
+Identify which input the planner overrides: duration or target finish. Recalculate dependent fields using the working calendar; do not accept contradictory start, finish and duration values. A shorter duration implies a higher required rate, which must be visible alongside the historical rate. Preview conflicts and downstream impacts before saving. Existing resource compatibility and quality gates still apply.
+
+Keep four distinct records:
+
+1. Original system estimate, including quantity, SKU/line/operation, rate, calendar and calculation version.
+2. First confirmed schedule baseline.
+3. Every subsequent confirmed plan revision, including the currently active plan.
+4. Actual production start, finish, good quantity, run hours and downtime, with correction history.
+
+Later estimates are versioned separately. Changing quantity, line or calendar must not erase the assumptions behind an earlier prediction. Planner overrides are not production actuals and must not be used as measured throughput history. Returning to the suggested timing is itself a recorded revision.
+
+## Complete revision log and reasons
+
+Every persisted business-data change in the connected scheduling workflow must produce an append-only revision event: creation, edits, moves, duration overrides, quantity changes, splits/merges, cancellations, unscheduling, actual corrections and reversals. Include schedule-affecting changes from Buyers, Warehouse and QA/QC, such as ETA revisions, receipt corrections, quality forecasts and disposition changes. View filters and unsaved drag previews are not business revisions.
+
+Each event records:
+
+- Stable event ID, entity/run/order references and prior/new version.
+- Changed fields with before/after values and units.
+- Actor and origin: human, import, integration or automated calculation.
+- Recorded timestamp and effective timestamp, retaining the timezone context.
+- Required reason category and explanation; linked evidence where available.
+- Related initiating event and affected runs/order lines.
+- Resulting start/finish, quantity coverage, readiness and customer-date impact where applicable.
+
+Proposed reason categories include supplier delay, receiving delay, quality hold, equipment downtime, staffing, customer request, priority change, quantity/scope change, inaccurate runtime estimate, calendar correction and data correction. “Other” requires an explanation. These categories need operational validation; a selected reason is reported evidence, not automatically a verified root cause.
+
+Require a reason when a person saves a business change. Imports and recalculations record the source revision and triggering event automatically. If a supplier change has no explanation, retain it as “reason not provided” and assign follow-up rather than inventing a cause or discarding the update.
+
+Persist the business change and audit event together. An audit failure must not leave an unlogged change. Repeated integration events must not duplicate revisions. Bulk edits share a change-set ID but retain each affected record's before/after values. Reversals and corrected explanations append events instead of deleting history. Preserve split/merge lineage and archived records.
+
+A run card exposes its chronological revision log; an order aggregates all linked runs. Users can filter by date, field, actor or reason and compare any two revisions. Apply record/evidence access controls to the history as well as the current view.
+
+## Quarterly schedule and prediction review
+
+Support quarter, month and custom-period reviews with drill-through to the underlying revisions. Preserve period-end snapshots or equivalent reproducible as-of views; later corrections must not silently rewrite previously issued reports.
+
+Report:
+
+- Change frequency: distinct runs/orders changed, revision counts, reasons and time between the change and planned start. Separate manual changes from automated consequences so one ETA update is not presented as many independent planning decisions.
+- Schedule movement: initial versus latest confirmed start/finish, net movement and cumulative movement, including moves earlier and repeated back-and-forth changes.
+- Estimate accuracy: original system duration and planner-selected duration versus actual comparable production hours, with signed error and absolute error by SKU, line and operation.
+- Schedule adherence: actual start/finish versus the first confirmed baseline and versus a defined frozen plan, such as the plan in effect before execution. Do not compare only against a last-minute revised date.
+- Delivery performance: actual delivery versus customer-requested and agreed dates separately, with partial deliveries measured by quantity. Production completion alone is not evidence of on-time delivery.
+- Delay explanations: linked supply, receiving, quality, equipment, staffing and planning events; distinguish recorded explanations from reviewed root causes and retain multiple contributing causes.
+
+Define the reporting cohort explicitly, for example runs originally due in the quarter. Include overdue unfinished and canceled runs separately; unfinished runs have lateness-to-date but no completed-runtime error. Show missing actuals and missing reasons as coverage gaps. Distinguish working hours/shifts from elapsed calendar time.
+
+Compare estimates only on a consistent quantity, operation and timing basis. Separate scope changes from prediction error; do not label a doubled order quantity as a speed-estimation failure. Preserve original predictions, and label any quantity-normalized analysis with its method. Human-reviewed patterns can inform future rate or planning-policy changes, with version history.
+
 ## Required data streams
 
 | Stream | Required inputs | Purpose |
@@ -53,6 +107,7 @@ When reliable history is unavailable, show an approved standard rate or planner-
 | Product and operation master | SKU/revision, operation route, compatible lines, units and conversions | Match the order to a valid production resource. |
 | Production actuals | Run/WO, SKU, line, operation, start/end, measured run hours, good output, rejects, setup and downtime | Establish comparable historical rates. |
 | Resource calendars | Shift times, staffing/capacity, breaks, maintenance, holidays, existing reservations | Convert hours into working shifts and finish dates. |
+| Revision and actual-event history | Before/after values, actor, reason, event/effective times, estimate versions and baseline snapshots | Reconstruct plans and explain changes and prediction errors. |
 | Planning standards | Approved fallback rates, setup/changeover/cleanup rules, estimate policy | Support estimates where history is insufficient. |
 | Material and quality readiness | BOM/WO requirements, stock/lot allocations, incoming supply, receipt and expected/actual quality release | Explain whether the proposed start is achievable. |
 | Fulfillment timing | FG quality forecast, staging, pickup and transit requirements | Identify customer-date risk after production. |
@@ -81,6 +136,12 @@ Production completion and customer delivery remain separate dates. Finished-good
 - A start-date change updates departmental priorities and delivery risk without changing quality disposition.
 - Revised throughput history proposes a new estimate without automatically rescheduling confirmed work.
 
+- A planner changes six shifts to eight without changing order quantity; both timings and the reason remain visible.
+- Every saved edit, reversal and integration update retains its before/after values and origin; failed audit persistence prevents an unlogged change.
+- One supplier ETA change links all resulting impacts without inflating the number of independent decisions.
+- Quarterly reports preserve the original baseline and include unfinished overdue work, missing actuals and later corrections explicitly.
+- Planner overrides never enter historical throughput as measured actuals.
+
 ## Details to validate before implementation
 
-Confirm historical actuals sources; minimum sample size and comparison window; runtime and downtime definitions; shift calendars; interruption rules; setup/changeover policy; order coverage rules; and provisional-run-to-WO reconciliation. These are implementation decisions, not additional approved functionality.
+Confirm historical actuals sources; minimum sample size and comparison window; runtime and downtime definitions; shift calendars; interruption rules; setup/changeover policy; order coverage rules; provisional-run-to-WO reconciliation; reason taxonomy; baseline freeze policy; reporting cohorts; and audit retention/access responsibilities. These are implementation decisions, not additional approved functionality.
