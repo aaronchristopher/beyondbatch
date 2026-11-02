@@ -2,11 +2,11 @@
 
 This extends the same project; the completed foundation and previous blockers remain below as history. Milestones and scope are in `plan.md`. No live resources, permission changes or messages are created by this checklist.
 
-## B1 — Persist one request in PostgreSQL (next)
-- [ ] Implement the normalized request/event/obligation transaction adapter, preserving original due times and audit identity.
+## B1 — Persist one request in PostgreSQL (implemented; recovery verification finishing)
+- [x] Implement the normalized request/event/obligation transaction adapter, preserving original due times and audit identity.
 - [ ] Apply the existing migration to a disposable test database; prove restart persistence, rollback, concurrent-version rejection and tenant isolation with a least-privilege role.
-- [ ] Verify: real PostgreSQL integration tests plus existing transaction/response-clock tests. No scripted-client substitute for database acceptance.
-Dependencies: none beyond an available local/test PostgreSQL runtime. Scope: M; likely `src/persistence/postgres-requests.mjs`, `tests/postgres-requests.test.mjs`, test harness, reviewed schema adjustments if required.
+- [x] Verify: native PostgreSQL 16.15 passed 20 integration scenarios, plus 217 fast tests. No scripted-client substitute for database acceptance.
+Implementation: `src/persistence/postgres-request-store.mjs`, focused failure tests, native integration suite and restricted-role test harness. No schema constraints were weakened. Production roles, backup/restore and deployment remain release gates.
 
 ## B2 — Read saved work through authorized API projections
 - [ ] Map persisted requests to the existing workspace response shape; do not serialize source bodies into lists.
