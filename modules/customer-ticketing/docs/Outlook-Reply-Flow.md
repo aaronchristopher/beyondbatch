@@ -1,10 +1,22 @@
-# Reply in the original Outlook email
+# Reply inside Beyond Batch, with Outlook as an option
 
-The initial desktop target is **Classic Outlook for Windows**. The desired production interaction is: request → Reply in Outlook → the relevant customer message in installed Outlook → user replies normally. Internal request IDs never need to appear in the subject. Other pilot users' Outlook versions should be checked during setup.
+The primary production interaction is: request → read its linked email trail → **Reply in Beyond Batch** → review the sender, recipients, body and attachments → explicitly send in the original conversation. **Open in Outlook** remains a secondary action. Internal request IDs never need to appear in the subject. The initial native desktop target remains Classic Outlook for Windows; other pilot users' Outlook versions should be checked during setup.
 
 ## Implemented in this slice
 
-The UI has a Reply in Outlook action on request detail and draft preview. The current sample-only site shows the connection requirement instead of inventing a working email URL. The server projection supports a verified source-email web link with separate per-user mailbox/evidence checks. Opening a source or preparing text never changes response status, stops a clock or closes a request.
+The UI shows each request with its original email subject, a separate movable email-trail window and a reply composer using fictional messages. Customer and internal threads remain distinguishable. Drafts are kept only in browser memory for the current sample session, never in Microsoft or a production database. Selecting attachments previews their names and sizes without uploading their contents. Sending is disabled. The sample-only site shows the Outlook connection requirement instead of inventing a working email URL. The server projection supports a verified source-email web link with separate per-user mailbox/evidence checks. Opening a source or preparing text never changes response status, stops a clock or closes a request.
+
+## Production in-app sending — still to build and approve
+
+Use a signed-in person's delegated Microsoft authorization for the human-operated composer, separately from the background read-only ingestion identity. Do not add organization-wide sending to the ingestion agent. Graph supports creating a reply or reply-all draft on the selected source message, editing it and sending that draft. The planned draft workflow requires `Mail.ReadWrite` for draft creation/updates and `Mail.Send` for sending from the signed-in user's mailbox. Both are new capabilities that must be explicitly configured and approved before enabling real sending. No such consent or credential has been created by this UI change.
+
+For shared/delegated sending, separately verify `Mail.Send.Shared`, the user's Exchange Send As or Send on Behalf rights, and the read/write permissions required for the chosen mailbox draft route. Full Access can also be required when using another mailbox's endpoint. Never infer these rights from a PM assignment, executive role, shared address or ingestion access. Confirm which mailbox receives the Sent copy during integration testing.
+
+The server must resolve the exact authorized source message and mailbox copy for the selected customer thread. It must respect the source's `replyTo` where present, use the chosen Reply or Reply All recipient set, remove duplicates and the sending identity, and show every recipient before sending. Never include addresses or attachments merely because they occur in a related internal thread. Recipient edits, new external domains and sender changes require revalidation. Executive operational visibility does not automatically grant source-email or send rights.
+
+Bind the approved draft version to its source message, sender, recipients, attachment hashes and body. A deliberate user Send action submits only that version; a new incoming reply, changed draft or changed access requires review again. Sanitize email HTML, scan uploads, enforce size/type limits and never execute instructions from source content. Implement a server-side send attempt ledger and duplicate suppression. A timeout after submission means unknown outcome: reconcile with Microsoft before retrying, rather than blindly sending a second copy.
+
+Graph's `202 Accepted` means accepted for processing, not delivery or resolution. Show a pending-verification state, reconcile Sent evidence and delivery failures, and preserve the request's obligations until a meaningful customer response has been verified. Partial replies satisfy only the addressed asks. Keep human completion confirmation separate. Audit draft approval, sender/recipient changes, send attempt, outcome and resulting request events without logging credentials or unnecessary message bodies. Automated reminders and auto-send remain disabled.
 
 Microsoft Graph's documented `webLink` opens the specific message in **Outlook on the web**, where the user chooses Reply or Reply All. It is not a documented external-browser-to-desktop launch URL or a guarantee that Outlook expands an entire conversation. The fallback deliberately preserves the real message context; `mailto:` is not substituted.
 
@@ -33,6 +45,9 @@ An Outlook add-in can use `displayMessageFormAsync` inside the Outlook host, but
 - Desktop pilot proves correct message selection across two accounts and shared-mailbox cases, failure fallback, and no silent auto-send before enabling the native button.
 
 Official references:
+- https://learn.microsoft.com/en-us/graph/api/message-createreply?view=graph-rest-1.0
+- https://learn.microsoft.com/en-us/graph/api/message-send?view=graph-rest-1.0
+- https://learn.microsoft.com/en-us/graph/outlook-send-mail-from-other-user
 - https://learn.microsoft.com/en-us/graph/api/resources/message?view=graph-rest-1.0
 - https://learn.microsoft.com/en-us/office/vba/api/outlook.namespace.getitemfromid
 - https://learn.microsoft.com/en-us/office/vba/api/outlook.mailitem.display

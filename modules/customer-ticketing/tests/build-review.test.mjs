@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const moduleRoot = fileURLToPath(new URL('../', import.meta.url));
-const artifacts = ['index.html', 'app.js', 'styles.css', 'fixtures/pm.json', 'fixtures/department.json', 'fixtures/president.json'];
+const artifacts = ['index.html', 'app.js', 'styles.css', 'fixtures/pm.json', 'fixtures/department.json', 'fixtures/president.json', 'fixtures/pm-email-trails.json', 'fixtures/department-email-trails.json', 'fixtures/president-email-trails.json'];
 const sampleTime = '2026-11-02T14:00:00.000Z';
 
 async function cleanCheckout(t) {
@@ -44,6 +44,8 @@ test('review build works from a clean module and reproduces scoped sample payloa
     assert.equal(data.coverage.mode, 'fictional');
     assert.equal(data.persona.role, persona);
     assert.equal(data.requests.length, counts[persona]);
+    const trails = JSON.parse(await readFile(resolve(directory, 'dist/review/fixtures', `${persona}-email-trails.json`), 'utf8'));
+    assert.deepEqual(Object.keys(trails).sort(), data.requests.map(request => request.id).sort());
     for (const request of data.requests) {
       assert.equal(request.outlookAction.status, 'not_connected');
       assert.equal(Object.hasOwn(request.outlookAction, 'href'), false);
@@ -52,6 +54,16 @@ test('review build works from a clean module and reproduces scoped sample payloa
       }
       if (persona === 'pm') assert.equal(request.owner, 'Avery');
       if (persona === 'department') assert.equal(request.department, 'QA');
+      const trail = trails[request.id];
+      assert.equal(trail.mode, 'fictional');
+      assert.equal(trail.requestId, request.id);
+      assert.equal(trail.threads[0].subject, request.emailSubject);
+      for (const thread of trail.threads) {
+        for (const message of thread.messages) {
+          assert.equal(JSON.stringify(data).includes(message.body), false, 'Email body leaked into workspace summary');
+          assert.match(message.from.address, /\.example$/);
+        }
+      }
     }
   }
   const html = firstBytes[0].toString();
@@ -61,9 +73,9 @@ test('review build works from a clean module and reproduces scoped sample payloa
   assert.match(html, /href="\.\/styles\.css"/);
   assert.match(html, /src="\.\/app\.js"/);
   assert.match(app, /\.\/fixtures\/\$\{persona\}\.json/);
-  assert.match(app, /Reply in Outlook/);
+  assert.match(app, /Open in Outlook/);
   assert.match(app, /function openHowItWorks/);
-  assert.doesNotMatch(app, /\/api\/workspace|innerHTML|outerHTML|insertAdjacentHTML/);
+  assert.doesNotMatch(app, /\/api\/|innerHTML|outerHTML|insertAdjacentHTML/);
 });
 
 test('review build requires module source even when generated output exists', async t => {

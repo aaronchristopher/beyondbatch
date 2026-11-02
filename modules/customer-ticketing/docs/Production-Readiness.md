@@ -6,7 +6,7 @@
 
 The current build is a **development scaffold** for response clocks/workflow, a Graph read adapter, data/access contracts and a runnable fixture interface. Check the repository's current test report and README for completed modules. It has no approved live-mail connection or verified production deployment. Demo identity selection must never be usable as production authentication. No production gates below are pre-checked from scaffold completion.
 
-The production target remains one Entra-authenticated application with an Azure API and worker, PostgreSQL as the source of workflow truth, Service Bus for durable jobs, private Blob evidence storage and Key Vault-managed credentials. Per-user and president views are server-authorized projections of the same records. No sending adapter, `Mail.Send`, `Mail.ReadWrite` or Teams-posting permission is required for the initial pilot.
+The production target remains one Entra-authenticated application with an Azure API and worker, PostgreSQL as the source of workflow truth, Service Bus for durable jobs, private Blob evidence storage and Key Vault-managed credentials. Per-user and president views are server-authorized projections of the same records. The read-only pilot does not need sending permissions. The requested human-operated in-app Reply workflow is a separate capability: it needs approved delegated draft/send access and the gates below before enabling real delivery. Automated sending and Teams posting remain disabled.
 
 ## Hard release gates
 
@@ -49,6 +49,16 @@ Every gate needs a named owner, dated result and evidence link in the release re
 - [ ] Changed requirements and contradictory replies invalidate stale proposals and reopen/review the same obligation when appropriate, preserving history. Cross-thread ambiguity is reviewable.
 - [ ] New evidence, owner changes and ticket version changes invalidate pending drafts/proposals as appropriate. AI outputs cannot execute tools, alter policy or issue arbitrary workflow commands.
 
+### In-app Reply gate — before enabling human-operated delivery
+
+- [ ] Separate signed-in user authorization allows draft creation and sending only from approved mailboxes. Source-read, sender and shared-mailbox rights are independently verified; the ingestion app remains read-only.
+- [ ] Reply and Reply All preserve the selected customer source thread and honor its reply-to address. Internal thread participants/content never leak into customer recipients or quoted content. Recipient edits and external domains are reviewed.
+- [ ] Explicit Send approval binds sender, recipients, body, attachments and source version. Stale drafts, changed permissions and new messages invalidate approval as appropriate. Attachments are scanned and constrained.
+- [ ] Duplicate clicks and uncertain Graph outcomes cannot silently send twice. Submission, Sent evidence, delivery failures, meaningful-response coverage and final task closure remain distinct and audited.
+- [ ] Two-account, shared-mailbox, reply-all, changed-recipient, stale-source, attachment, timeout and access-revocation tests pass. Open in Outlook remains an authorized fallback. No autonomous delivery is enabled.
+
+See [Outlook Reply Flow](Outlook-Reply-Flow.md) for the implementation contract. These gates do not block the fictional composer demonstration.
+
 ### 5. Minimum first-wave evaluation — QA + business reviewers
 
 Use **at least 200 labeled message events** as a minimum launch-screening set, with actionable and negative mail, quotes, samples, specifications, production/shipping questions, acknowledgments, partial answers, forwards, duplicate mailbox copies, sent replies, requirement changes, attachments, ambiguous owners and sensitive exclusions. Include linked sequences, not only isolated messages. Keep thread groups and their copies together when splitting development and holdout sets. At least two reviewers independently label a subset and adjudicate disagreements. Report actual request, thread and closure-candidate denominators; 200 messages are not 200 independent customer cases.
@@ -82,12 +92,13 @@ These minimal screening targets narrow the first-wave release; they do not repla
 | P0 | Durable scheduling, webhook renewal, five-minute recognition and hourly recovery | Persistence + Graph | Lost notification, expired token, throttling and crash scenarios |
 | P0 | Approved provider adapter, restricted context and bounded extraction proposals | Provider/data approval | Labeled holdout report with cost, latency, review rate and source support |
 | P0 | Production PM/department/president routes and evidence authorization | Identity + persistence | End-to-end workflow, privacy and browser acceptance results |
+| P0 | Human-operated in-app Reply with Outlook fallback | Identity, source access and separately approved sending scope | In-app Reply gate above; explicit send approval and verified Sent reconciliation |
 | P0 | Retention, monitoring, incident/rollback and duty handover | Above packages | All hard gates evidenced; controlled release decision |
 | P1 | Expand request categories and cross-thread automation | First-wave measured results | Per-category precision/recall/ownership gates and review capacity |
 | P1 | Enroll the next mailbox/customer wave | Approved mapping + scope | Sent-path coverage, fresh baseline, negative access test and shadow review per wave |
 | P1 | Improve forecasts and relevant-record retrieval | Reliable historical events + separate record permissions | Forecast calibration and traceable, ACL-filtered retrieval |
 | P2 | Monday, Sage X3, CAPS Control and RawsRus adapters | Separate business/API approvals | Read-only reconciliation first; source-of-truth and conflict policy per field |
-| P2 | Draft approval and eventual delivery | Separate sending authorization and security review | Recipient verification, quiet hours, approval expiry, duplicate suppression, unknown-send reconciliation, audit and kill switch |
+| P2 | Automated reminders and eventual approved automatic delivery | Reliable human-operated sending and separate automation authorization | Recipient verification, quiet hours, approval expiry, duplicate suppression, unknown-send reconciliation, audit and kill switch |
 
 Organization-wide expansion retains exclusions. Add only approved operational mailbox cohorts; verify coverage, identity mappings, provider capacity, privacy and review workload before each wave. No companywide access grant or automated outbound sending is a prerequisite for the MVP.
 
