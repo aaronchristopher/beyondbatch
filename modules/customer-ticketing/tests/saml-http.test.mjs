@@ -33,7 +33,9 @@ function dependencies(patch={}) {
 
 async function harness(run,patch={},tls=true) {
   const deps=dependencies(patch);
-  const handler=createSamlAuthHandler({manager:deps.manager,rateLimit:deps.rateLimit,audit:deps.audit,publicOrigin});
+  // Explicit loopback allowlist is isolated to this local TLS fixture.
+  const networkAccess=Object.hasOwn(patch,'networkAccess')?patch.networkAccess:{allowedClientIps:['127.0.0.1']};
+  const handler=createSamlAuthHandler({manager:deps.manager,rateLimit:deps.rateLimit,audit:deps.audit,publicOrigin,networkAccess});
   const server=tls?createHttpsServer({key:fixture.config.spPrivateKey,cert:fixture.config.spCertificate},handler):createHttpServer(handler);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const send=({path='/health',method='GET',headers={},body}={})=>new Promise((resolve,reject)=>{
@@ -49,13 +51,13 @@ async function harness(run,patch={},tls=true) {
 }
 
 test('SAML HTTP factory requires every dependency and a canonical HTTPS origin',()=>{
-  const deps=dependencies();
+  const deps={...dependencies(),networkAccess:{allowedClientIps:['127.0.0.1']}};
   for(const origin of ['http://ticketing.example.test','https://user:pass@ticketing.example.test','https://ticketing.example.test/path','https://ticketing.example.test?x=1','https://ticketing.example.test/#x']) {
     assert.throws(()=>createSamlAuthHandler({...deps,publicOrigin:origin}),TypeError);
   }
-  assert.throws(()=>createSamlAuthHandler({publicOrigin,manager:deps.manager}),TypeError);
-  assert.throws(()=>createSamlAuthHandler({publicOrigin,manager:{},rateLimit:deps.rateLimit}),TypeError);
-  assert.throws(()=>createSamlAuthHandler({publicOrigin,manager:deps.manager,rateLimit:deps.rateLimit}),TypeError);
+  assert.throws(()=>createSamlAuthHandler({publicOrigin,networkAccess:deps.networkAccess,manager:deps.manager}),TypeError);
+  assert.throws(()=>createSamlAuthHandler({publicOrigin,networkAccess:deps.networkAccess,manager:{},rateLimit:deps.rateLimit}),TypeError);
+  assert.throws(()=>createSamlAuthHandler({publicOrigin,networkAccess:deps.networkAccess,manager:deps.manager,rateLimit:deps.rateLimit}),TypeError);
 });
 
 test('minimal TLS health response exposes no data and sets security headers',async()=>harness(async(send,calls)=>{
@@ -204,3 +206,108 @@ test('a failed mandatory denial audit fails closed with a generic unavailable re
   assert.equal(response.status,503);assert.deepEqual(JSON.parse(response.body),{error:'Authentication service unavailable'});
   assert.equal(calls.authenticate.length,0);
 },{audit:async()=>{throw new Error('private audit connection string');}}));
+
+// These are fictional documentation addresses, never a production allowlist.
+const fictionalVpnIp='198.51.100.9',fictionalOutsideIp='203.0.113.27';
+const proxyNetwork=()=>({allowedClientIps:[fictionalVpnIp],trustedProxy:{peerIps:['127.0.0.1'],clientIpHeader:'x-bb-client-ip'}});
+
+test('network configuration is mandatory and cannot be replaced by an allow callback',()=>{
+  const deps={...dependencies(),publicOrigin};
+  assert.throws(()=>createSamlAuthHandler(deps),TypeError);
+  for(const networkAccess of [null,{},false,{allowedClientIps:[]},()=>true,{authorize:()=>fictionalVpnIp}]) {
+    assert.throws(()=>createSamlAuthHandler({...deps,networkAccess}),TypeError);
+  }
+});
+
+test('an off-network peer receives no health, redirect, cookie, session or private-route response',async()=>harness(async(send,calls)=>{
+  for(const path of ['/health','/auth/saml/login','/auth/saml/acs','/auth/session','/auth/logout','/api/workspace','/attachments/guessed-id','/export']) {
+    const post=['/auth/saml/acs','/auth/logout'].includes(path);
+    const response=await send({path,method:post?'POST':'GET',headers:{
+      Cookie:`__Host-bb-session=${sessionToken}; __Host-bb-login=${browserToken}`,
+      'X-Forwarded-For':fictionalVpnIp,'X-BB-Client-IP':fictionalVpnIp,
+      ...(post?{'Content-Type':'application/x-www-form-urlencoded',Origin:publicOrigin,'X-CSRF-Token':csrfToken}:{}),
+    },...(post?{body:'SAMLResponse=private&RelayState=private'}:{})});
+    assert.equal(response.status,403,path);assert.deepEqual(JSON.parse(response.body),{error:'Access denied'});
+    assert.equal(response.headers.location,undefined);assert.equal(response.headers['set-cookie'],undefined);
+    assert.equal(response.headers['cache-control'],'no-store');
+    assert.ok(!response.body.includes('customer1'));
+  }
+  assert.equal(calls.start,0);assert.equal(calls.finish.length,0);assert.equal(calls.authenticate.length,0);
+  assert.equal(calls.logout.length,0);assert.equal(calls.rate.length,0);
+  assert.equal(calls.audit.length,8);assert.ok(calls.audit.every(event=>event.reason==='network'));
+},{networkAccess:{allowedClientIps:[fictionalVpnIp]}}));
+
+test('trusted proxy mode uses only its validated client address for the network gate and rate key',async()=>harness(async(send,calls)=>{
+  const response=await send({path:'/auth/session',headers:{Cookie:`__Host-bb-session=${sessionToken}`,
+    'X-BB-Client-IP':fictionalVpnIp,'X-Forwarded-For':'untrusted-client-chain','X-Real-IP':fictionalOutsideIp}});
+  assert.equal(response.status,200);assert.deepEqual(JSON.parse(response.body).principal,principal);
+  assert.deepEqual(calls.authenticate,[sessionToken]);
+  assert.deepEqual(calls.rate,[{scope:'session',clientKey:fictionalVpnIp}]);
+},{networkAccess:proxyNetwork()}));
+
+test('an approved network still requires a session and CSRF protection',async()=>harness(async(send,calls)=>{
+  const headers={'X-BB-Client-IP':fictionalVpnIp};
+  assert.equal((await send({path:'/auth/session',headers})).status,401);
+  assert.equal((await send({path:'/auth/logout',method:'POST',headers:{...headers,Cookie:`__Host-bb-session=${sessionToken}`,Origin:publicOrigin}})).status,403);
+  assert.equal(calls.authenticate.length,0);assert.equal(calls.logout.length,0);
+  assert.ok(calls.audit.every(event=>event.reason===undefined));
+},{networkAccess:proxyNetwork()}));
+
+test('a saved session cannot continue when its next request comes from outside the VPN allowlist',async()=>harness(async(send,calls)=>{
+  const headers={Cookie:`__Host-bb-session=${sessionToken}`};
+  assert.equal((await send({path:'/auth/session',headers:{...headers,'X-BB-Client-IP':fictionalVpnIp}})).status,200);
+  assert.equal((await send({path:'/auth/session',headers:{...headers,'X-BB-Client-IP':fictionalOutsideIp}})).status,403);
+  assert.deepEqual(calls.authenticate,[sessionToken]);assert.equal(calls.rate.length,1);
+  assert.equal(calls.audit.at(-1).reason,'network');
+},{networkAccess:proxyNetwork()}));
+
+test('a forwarded approved address cannot bypass an untrusted proxy peer',async()=>harness(async(send,calls)=>{
+  const response=await send({path:'/auth/session',headers:{Cookie:`__Host-bb-session=${sessionToken}`,
+    'X-BB-Client-IP':fictionalVpnIp,'X-Forwarded-For':fictionalVpnIp}});
+  assert.equal(response.status,403);assert.equal(calls.authenticate.length,0);assert.equal(calls.rate.length,0);
+  assert.equal(calls.audit[0].reason,'network');
+},{networkAccess:{allowedClientIps:[fictionalVpnIp],trustedProxy:{peerIps:['192.0.2.20'],clientIpHeader:'x-bb-client-ip'}}}));
+
+test('proxy mode denies missing, duplicate and malformed client headers without a direct-address fallback',async()=>harness(async(send,calls)=>{
+  const invalidHeaders=[{}, {'X-Forwarded-For':fictionalVpnIp}, {'Forwarded':`for=${fictionalVpnIp}`},
+    {'X-BB-Client-IP':[fictionalVpnIp,fictionalVpnIp]}, {'X-BB-Client-IP':`${fictionalVpnIp}, ${fictionalOutsideIp}`},
+    {'X-BB-Client-IP':`${fictionalVpnIp}:443`}, {'X-BB-Client-IP':'vpn.example.test'},
+    {'X-BB-Client-IP':'PRIVATE-HEADER-DO-NOT-LOG'}, {'X-BB-Client-IP':'[2001:db8::10]'}];
+  for(const headers of invalidHeaders) {
+    const response=await send({path:'/auth/session',headers:{Cookie:`__Host-bb-session=${sessionToken}`,...headers}});
+    assert.equal(response.status,403,JSON.stringify(headers));assert.deepEqual(JSON.parse(response.body),{error:'Access denied'});
+  }
+  assert.equal(calls.authenticate.length,0);assert.equal(calls.rate.length,0);
+  assert.ok(calls.audit.every(event=>event.reason==='network'));
+},{networkAccess:{...proxyNetwork(),allowedClientIps:[fictionalVpnIp,'127.0.0.1']}}));
+
+test('the running HTTP network policy is an immutable snapshot of its configuration',async()=>{
+  const networkAccess=proxyNetwork();
+  await harness(async(send,calls)=>{
+    networkAccess.allowedClientIps.push(fictionalOutsideIp);
+    networkAccess.trustedProxy.peerIps.splice(0,1,'192.0.2.20');
+    networkAccess.trustedProxy.clientIpHeader='x-forwarded-for';
+    assert.equal((await send({path:'/auth/session',headers:{Cookie:`__Host-bb-session=${sessionToken}`,'X-BB-Client-IP':fictionalOutsideIp}})).status,403);
+    assert.equal((await send({path:'/auth/session',headers:{Cookie:`__Host-bb-session=${sessionToken}`,'X-BB-Client-IP':fictionalVpnIp}})).status,200);
+    assert.deepEqual(calls.authenticate,[sessionToken]);
+  },{networkAccess});
+});
+
+test('network denials have a bounded audit reason without raw address, header, route or cookie data',async()=>harness(async(send,calls)=>{
+  const secret='PRIVATE-HEADER-DO-NOT-LOG';
+  const response=await send({path:`/attachments/${secret}`,headers:{Cookie:`__Host-bb-session=${sessionToken}`,'X-BB-Client-IP':secret}});
+  assert.equal(response.status,403);assert.equal(calls.audit.length,1);
+  const event=calls.audit[0];assert.deepEqual(Object.keys(event).sort(),['at','reason','route','statusCode','type']);
+  assert.equal(event.reason,'network');assert.equal(event.route,'unknown');assert.equal(event.statusCode,403);
+  assert.equal(event.type,'auth.http_denied');assert.equal(Object.isFrozen(event),true);
+  const serialized=JSON.stringify(event);
+  for(const value of [secret,sessionToken,fictionalVpnIp,'127.0.0.1'])assert.ok(!serialized.includes(value));
+  assert.equal(calls.authenticate.length,0);assert.equal(calls.rate.length,0);
+},{networkAccess:proxyNetwork()}));
+
+test('an unavailable mandatory network-denial audit still denies access without disclosing its failure',async()=>harness(async(send,calls)=>{
+  const response=await send({path:'/auth/session',headers:{Cookie:`__Host-bb-session=${sessionToken}`,'X-BB-Client-IP':fictionalOutsideIp}});
+  assert.equal(response.status,503);assert.deepEqual(JSON.parse(response.body),{error:'Authentication service unavailable'});
+  assert.equal(response.headers.location,undefined);assert.equal(response.headers['set-cookie'],undefined);
+  assert.equal(calls.authenticate.length,0);assert.equal(calls.rate.length,0);
+},{networkAccess:proxyNetwork(),audit:async()=>{throw new Error('private audit credentials');}}));

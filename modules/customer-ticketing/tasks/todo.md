@@ -14,11 +14,13 @@ Implementation: `src/persistence/postgres-request-store.mjs`, focused failure te
 - [ ] Verify: API integration tests, direct-ID denial and restart/reload of saved data.
 Dependencies: B1. Scope: M; likely workspace repository, API handler and integration tests.
 
-## B3 — Exclusive SAML 2.0 sign-in with mandatory MFA
+## B3 — Exclusive SAML 2.0, mandatory MFA and VPN access
 - [x] Implement strict Node-SAML validation, shared PostgreSQL replay/session/limiter storage, current identity/grant/eligibility resolution and HTTPS login/session/logout components. Verify genuine signed assertions and composed fictional HTTPS flows. No production listener or tenant changes. See [SAML Integration](../docs/SAML-Integration.md).
+- [x] Implement mandatory exact-IP network checks for every SAML HTTP request, including login/ACS/health and valid sessions; use strict direct or dedicated-proxy address derivation. Test off-network TLS peers, forged headers and configuration failure. See [Network Access](../docs/Network-Access.md); actual VPN/deployed acceptance remains open.
+- [ ] Verify `beyondbatch.com` domain control, dedicated public VPN exits, proxy overwrite/private-origin binding, IPv4/IPv6 routing, concurrent-user quotas and off-VPN browser denial before configuring live DNS/network policies.
 - [x] Block imported demo-server factories and the legacy bearer-token prototype in production; regression-test construction and later environment changes. These safeguards are not SAML authentication.
 - [ ] Compose the implemented SAML/session handler into a separate production entry point and authorized workspace using actual reviewed configuration. Exclude demo and legacy bearer entry points from its image.
-- [ ] Configure the separate human SAML enterprise app, assignment and app-scoped enforced MFA/authentication strength; verify signed MFA claims. No OIDC, password, magic-link, bearer-token or proxy-header human-login fallback.
+- [ ] Configure the separate human SAML enterprise app, assignment and app-scoped approved-network restriction plus enforced MFA/authentication strength; verify signed MFA claims. No OIDC, password, magic-link, bearer-token or proxy-header human-login fallback.
 - [x] Implement opaque server sessions, CSRF, rotation/logout/revocation, authentication-age and directory-eligibility bounds; test in-flight expiry and revocation.
 - [ ] Supply the real directory eligibility provider, durable audit sink, narrow runtime roles, key retrieval, cleanup scheduler and trusted ingress configuration. Wire current grant/resource checks into every customer-data route.
 - [ ] Verify two real accounts, excluded users/admins, malformed/replayed SAML, revoked sessions, cross-customer access and direct API/attachment/default-origin bypass attempts. All private-data paths deny access if required identity or authorization checks fail.
@@ -106,7 +108,7 @@ Dependencies: Q1 and release decision. Scope: M per focused infrastructure/deplo
 - [ ] Azure subscription/resource scope and deployment path confirmed
 - [ ] Entra app registrations and approved mailbox scope
 - [ ] Customer-to-PM and backup mapping
-- [ ] Exclusive Entra SAML 2.0, enforced MFA and server authorization integrated and deployed bypass tests passed
+- [ ] Exclusive Entra SAML 2.0, enforced MFA, approved VPN public-IP access and server authorization integrated; deployed disconnect/routing/bypass tests passed
 - [ ] PostgreSQL migrations executed and recovery validated
 - [ ] Durable jobs, polling and delta recovery in tenant; subscriptions when enabled
 - [ ] Provider/model processing authorization and evaluation

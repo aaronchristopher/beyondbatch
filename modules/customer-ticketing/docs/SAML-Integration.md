@@ -4,6 +4,8 @@
 
 ## Implemented flow
 
+Every request first passes the mandatory [VPN/public-IP gate](Network-Access.md), including login, ACS and health. The configured network is necessary in addition to SAML/MFA and current permissions. The target public origin is `https://beyondbatch.com`; DNS and live network policy are not configured.
+
 1. `GET /auth/saml/login` creates independent random browser correlation and RelayState values. It records only their hashes, the request ID, expiry and any prior session hash. The SP produces a signed AuthnRequest for the fixed UniWell tenant endpoint. The prior session is captured here because the main Lax cookie is normally absent on the IdP's cross-site POST.
 2. `POST /auth/saml/acs` accepts only a bounded two-field form. The browser correlation cookie and pending RelayState must match, and the pending login is consumed atomically. Node-SAML verifies both signatures and consumes shared request/assertion replay markers. The wrapper rejects missing MFA, wrong immutable identity, ambiguous claims, wrong destination/recipient, stale lifetimes and malformed XML.
 3. Current database grants and a fresh, independently supplied directory eligibility result must authorize that immutable identity. No principal is created automatically. A successful login creates a fresh opaque session, revokes the previous session and returns a browser-session cookie. No password, bearer token, email link or proxy header can create a session.
@@ -17,7 +19,8 @@
 | `src/security/saml-service-provider.mjs` | Strict configuration, signed AuthnRequests, Node-SAML validation and verified identity/MFA extraction |
 | `src/security/auth-session.mjs` | Browser correlation, opaque cookies, session deadlines, rotation/logout, current authorization, audit decisions and limiter composition |
 | `src/security/application-principal.mjs` | Current identity/grant/eligibility mapping; explicitly not authentication |
-| `src/security/saml-http.mjs` | HTTPS/host enforcement, bounded forms, headers/cookies, method/origin checks and generic responses |
+| `src/security/saml-http.mjs` | HTTPS/host and mandatory network enforcement, bounded forms, headers/cookies, method/origin checks and generic responses |
+| `src/security/network-access.mjs` | Exact-IP allowlists, strict direct/dedicated-proxy address derivation and denial on every handled request |
 | `src/persistence/postgres-auth-store.mjs` | Shared atomic replay/correlation storage, session touch/revocation and rate limiting |
 | `src/persistence/postgres-principal-loader.mjs` | Fixed-tenant read-only repeatable-read principal/grant lookup against the existing schema |
 | `db/002_auth.sql` | Separate auth tables; no production roles, credentials or permissions |
@@ -58,7 +61,7 @@ Recheck authorization inside future customer-data mutation transactions. A sessi
 
 Apply `001_core.sql` and `002_auth.sql` only in an approved environment. Use separate, narrowly privileged connection pools for authentication state and current application-grant reads. Auth namespaces are trusted server configuration: adapter namespace filtering is **not database RLS** and does not contain a compromised auth database credential. Ordinary user/ingestion database roles must not access auth tables. The principal loader uses fixed internal/Entra tenant configuration, transaction-local tenant context and a read-only repeatable-read transaction.
 
-Shared rate limits are atomic across instances, with no memory fallback. Initial source defaults per direct client address are: login 10/15 minutes, ACS 20/15 minutes, logout 20/15 minutes, session and unknown-data routes 120/minute. These are fixed windows beginning at the first accepted request. The handler uses only the TLS socket address; it never trusts client-supplied forwarded headers. Before production behind a reverse proxy, choose and test a trusted client-address derivation and edge limits, or all users behind that proxy may share a quota. Do not turn throttling off to bypass a test failure.
+Shared rate limits are atomic across instances, with no memory fallback. Initial source defaults per canonical permitted client address are: login 10/15 minutes, ACS 20/15 minutes, logout 20/15 minutes, session and unknown-data routes 120/minute. These are fixed windows beginning at the first accepted request. The mandatory network policy uses only the TLS socket peer in direct mode, or a singular dedicated header from an explicitly trusted proxy peer in proxy-only mode. There is no automatic forwarded-header fallback. All employees sharing one VPN exit share a quota; production capacity and edge controls must be verified without disabling throttling. Exact configuration and deployment trust requirements are in [Network Access](Network-Access.md).
 
 The handler requires TLS on its incoming socket and exact configured Host. An edge-to-origin HTTP hop does not satisfy it; production must use a verified HTTPS origin path. Bare origin/default-hostname routes must be network-restricted and independently tested. A ten-second HTTP dependency deadline limits waiting; it does not cancel already started store operations. Failed/abandoned logins may leave unused, unguessable session records until expiry, so schedule `prune(nowMs)` and monitor storage growth. Do not extend a response deadline when a dependency is slow.
 
@@ -78,6 +81,7 @@ const manager = createSamlSessionManager({
 });
 const authHandler = createSamlAuthHandler({
   manager, publicOrigin: approvedHttpsOrigin,
+  networkAccess: approvedNetworkAccessConfig, // Required exact VPN exits and, if used, dedicated proxy trust.
   rateLimit: createAuthRateLimiter({ store: authStore }), audit: approvedSecurityAuditSink,
 });
 ```
@@ -90,10 +94,10 @@ The fast tests cover genuine signed SAML, malformed/forged/replayed responses, w
 
 Before live use:
 
-1. Confirm the production BeyondBatch origin/entity ID/ACS and reviewed server composition. Wire authorized persisted workspace/resource routes; keep all demo and test modules out of the production image.
-2. Approve/configure the separate human SAML enterprise app, request-verification certificate, signing certificates, immutable claims, MFA claims, assignments and enforced app-scoped Conditional Access. Reuse the reader app separately without broadening it.
+1. Verify domain control and configure the approved `beyondbatch.com` origin/entity ID/ACS, VPN exits, dedicated proxy/origin restrictions and reviewed server composition. Wire authorized persisted workspace/resource routes; keep all demo and test modules out of the production image.
+2. Approve/configure the separate human SAML enterprise app, request-verification certificate, signing certificates, immutable claims, MFA claims, assignments and enforced app-scoped Conditional Access requiring both approved network and MFA. Reuse the reader app separately without broadening it.
 3. Implement the approved directory eligibility synchronization/provider, durable audit sink and retention, narrow runtime DB roles, key-vault retrieval/rotation, shared-store cleanup and monitored ingress controls.
-4. Verify real browser cookie behavior, two accounts, actual Entra MFA and revocation, proxy/origin restrictions, resource/attachment denial and an independent deployed security assessment. No Node HTTPS fixture substitutes for these browser/tenant tests.
+4. Verify real browser cookie behavior, two accounts, actual Entra MFA and revocation, VPN disconnect and spoofed-header denials, proxy/origin restrictions, resource/attachment denial and an independent deployed security assessment. No Node HTTPS fixture substitutes for these browser/tenant tests.
 
 Do not connect private email or enable sending until [Security SAML Access](Security-SAML-Access.md) and [Production Readiness](Production-Readiness.md) pass. Source completion does not grant deployment, permissions or credentials.
 

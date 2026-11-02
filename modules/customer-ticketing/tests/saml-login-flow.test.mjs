@@ -25,16 +25,18 @@ async function app(t){
     loadEligibility:async identity=>({...identity,accountEnabled:enabled,appAssigned:enabled,checkedAt:new Date().toISOString()}),
   });
   const makeHandler=()=>createSamlAuthHandler({publicOrigin:new URL(fixture.config.acsUrl).origin,
+    // Actual loopback TCP peers stand in for approved/unapproved VPN egress.
+    networkAccess:{allowedClientIps:['127.0.0.1']},
     manager:createSamlSessionManager({store,resolvePrincipal,audit:async event=>audit.push(event),serviceProvider:createSamlServiceProvider({config:fixture.config,store})}),
     rateLimit:createAuthRateLimiter({store}),audit:async event=>audit.push(event)});
   let handler=makeHandler();
   const server=https.createServer({key:fixture.config.spPrivateKey,cert:fixture.config.spCertificate},(req,res)=>handler(req,res));
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));fixture.dispose();});
-  function request(path,{method='GET',headers={},body}={}){
+  function request(path,{method='GET',headers={},body,localAddress='127.0.0.1'}={}){
     return new Promise((resolve,reject)=>{
       // Self-signed local test server only. Runtime requires verified HTTPS.
-      const req=https.request({hostname:'127.0.0.1',port:server.address().port,path,method,rejectUnauthorized:false,
+      const req=https.request({hostname:'127.0.0.1',port:server.address().port,path,method,rejectUnauthorized:false,localAddress,
         headers:{host:new URL(fixture.config.acsUrl).host,...headers}},res=>{
         const chunks=[];res.on('data',chunk=>chunks.push(chunk));res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,body:Buffer.concat(chunks).toString()}));
       });req.on('error',reject);req.end(body);
@@ -46,9 +48,9 @@ async function app(t){
     const requestId=requestXml.match(/\bID="([^"]+)"/)[1];
     return {cookie:response.headers['set-cookie'][0].split(';')[0],requestId,relayState:url.searchParams.get('RelayState')};
   }
-  async function complete(login,overrides={}){
+  async function complete(login,overrides={},transport={}){
     const body=new URLSearchParams({SAMLResponse:fixture.createResponse({requestId:login.requestId,...overrides}),RelayState:login.relayState}).toString();
-    return request('/auth/saml/acs',{method:'POST',body,headers:{cookie:login.cookie,'content-type':'application/x-www-form-urlencoded'}});
+    return request('/auth/saml/acs',{...transport,method:'POST',body,headers:{cookie:login.cookie,'content-type':'application/x-www-form-urlencoded'}});
   }
   return {request,begin,complete,audit,origin:new URL(fixture.config.acsUrl).origin,disable:()=>{enabled=false;},replica:()=>{handler=makeHandler();},tid};
 }
@@ -87,4 +89,41 @@ test('replayed login and newly disabled identity cannot regain an existing sessi
   const replay=await f.complete(start);assert.equal(replay.status,401,replay.body);
   f.disable();const denied=await f.request('/auth/session',{headers:{cookie:sessionCookie(first)}});assert.equal(denied.status,403,denied.body);
   assert.equal((await f.request('/auth/session',{headers:{cookie:sessionCookie(first)}})).status,401);
+});
+
+test('an issued MFA session cannot read or log out from an unapproved TCP source',async t=>{
+  const f=await app(t),accepted=await f.complete(await f.begin());
+  assert.equal(accepted.status,303,accepted.body);
+  const cookie=sessionCookie(accepted),before=await f.request('/auth/session',{headers:{cookie}});
+  assert.equal(before.status,200,before.body);
+  const {csrfToken}=JSON.parse(before.body);
+  const acceptedCount=f.audit.filter(e=>e.type==='auth.session_accepted').length;
+  for(const path of ['/auth/session','/api/workspace','/attachments/fictional','/export']){
+    const response=await f.request(path,{localAddress:'127.0.0.2',headers:{cookie,'x-forwarded-for':'127.0.0.1','x-bb-client-ip':'127.0.0.1'}});
+    assert.equal(response.status,403,response.body);
+    assert.deepEqual(JSON.parse(response.body),{error:'Access denied'});
+    assert.equal(response.headers['set-cookie'],undefined);
+  }
+  assert.equal(f.audit.filter(e=>e.type==='auth.session_accepted').length,acceptedCount);
+  const denied=await f.request('/auth/logout',{localAddress:'127.0.0.2',method:'POST',headers:{cookie,origin:f.origin,'x-csrf-token':csrfToken}});
+  assert.equal(denied.status,403,denied.body);
+  // Network denial does not mutate the session; returning to the approved path
+  // remains subject to its original idle/absolute/MFA/grant restrictions.
+  assert.equal((await f.request('/auth/session',{headers:{cookie}})).status,200);
+  assert.equal((await f.request('/auth/logout',{method:'POST',headers:{cookie,origin:f.origin,'x-csrf-token':csrfToken}})).status,204);
+  assert.ok(f.audit.some(e=>e.type==='auth.http_denied'&&e.reason==='network'));
+});
+
+test('an off-network signed ACS cannot create a session or consume the pending login',async t=>{
+  const f=await app(t);
+  const blockedStart=await f.request('/auth/saml/login',{localAddress:'127.0.0.2'});
+  assert.equal(blockedStart.status,403,blockedStart.body);
+  assert.equal(blockedStart.headers.location,undefined);
+  const login=await f.begin();
+  const blocked=await f.complete(login,{}, {localAddress:'127.0.0.2'});
+  assert.equal(blocked.status,403,blocked.body);
+  assert.equal(blocked.headers['set-cookie'],undefined);
+  const allowed=await f.complete(login);
+  assert.equal(allowed.status,303,allowed.body);
+  assert.equal((await f.request('/auth/session',{headers:{cookie:sessionCookie(allowed)}})).status,200);
 });
