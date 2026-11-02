@@ -78,7 +78,7 @@ TICKETING_TEST_DATABASE_URL='postgresql://postgres:fictional-test-only@127.0.0.1
 
 The suite accepts only loopback databases named `beyondbatch_ticketing_test` or that prefix plus a safe suffix. It refuses an existing `bb` schema. It applies the migration, creates a temporary restricted LOGIN role, seeds fictional records, runs operations using that role and removes its test schema/role afterward. Never point it at a live database. The CI workflow provides a disposable PostgreSQL 16 service with no deployment credentials.
 
-Local PostgreSQL WASM checks can validate schema, sequential transactions, RLS and clean-close persistence; they are not evidence of native connection-pool behavior, concurrent row locks, server-crash recovery or production restore. Native CI results and exact limitations are recorded in `Implementation-Status.md`.
+Local PostgreSQL WASM checks can validate schema, sequential transactions, RLS and clean-close persistence; they are not evidence of native connection-pool behavior, concurrent row locks, server-crash recovery or production restore. Native CI results and exact limitations are recorded in `Implementation-Status.md`. The CI workflow also runs `tests/helpers/postgres-restart.mjs prepare`, restarts its disposable database service, then runs `verify` and `cleanup`. Verification checks the database server start time, the complete saved records and duplicate-safe retry. Its temporary fixture credential is stored only in the ignored `.fixture-data` directory with mode 0600 and deleted by cleanup. This is a graceful service-restart check, not a backup/restore or abrupt-crash test.
 
 ## Deliberately incomplete integration
 

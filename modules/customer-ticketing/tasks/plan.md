@@ -34,7 +34,7 @@ The milestone sequence is a dependency order, not a promise that every stage can
 
 ## Implementation task index
 
-Detailed acceptance criteria, dependencies and file boundaries are in `todo.md`. **B1: persist one request in PostgreSQL** is implemented with native database checks; recovery verification is being completed. **B2: read saved work through authorized API projections** follows. B2–B4 complete the signed-in saved-workspace milestone without live mailbox ingestion or model keys.
+Detailed acceptance criteria, dependencies and file boundaries are in `todo.md`. **B1: persist one request in PostgreSQL** is complete in a disposable PostgreSQL service, including actual server-restart persistence and native concurrency/permission checks. **B2: read saved work through authorized API projections** follows. B2–B4 complete the signed-in saved-workspace milestone without live mailbox ingestion or model keys.
 
 ## Inputs and approvals at the point they are needed
 
