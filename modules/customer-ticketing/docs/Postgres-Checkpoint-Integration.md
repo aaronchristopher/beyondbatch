@@ -1,5 +1,7 @@
 # PostgreSQL checkpoint repository — November 2, 2026
 
+**Later B1 update:** the normalized request repository is now implemented separately in `postgres-request-store.mjs`; see [PostgreSQL request persistence](Postgres-Requests.md) and [current verification status](Implementation-Status.md). The request adapter uses the pinned `pg` dependency. The checkpoint-only implementation and its original verification limits below are retained as history; its page writer/coordinator remains unfinished.
+
 ## What this slice implements
 
 `src/persistence/postgres-checkpoints.mjs` contains parameterized PostgreSQL operations against the existing `bb.sync_folder_checkpoints`, `bb.mailbox_approvals` and `bb.tenants` schema. It accepts an injected `pg`-compatible pool; it does not contain a connection string, install a driver, create a connection by itself or provision any infrastructure.

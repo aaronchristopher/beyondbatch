@@ -6,7 +6,10 @@
  *   lastMeaningfulResponseAt, lastCustomerMessageAt, resolvedAt,
  *   events: readonly canonical events[], responseObligations: readonly[] }.
  * Each obligation retains its original start/deadline and outcome even when the
- * active clock stops. Response and resolution are deliberately separate facts.
+ * active clock stops. endedByEventId names its exact ending evidence event;
+ * previousObligationId links recurring clocks to the last obligation created in
+ * source-time replay order (lineage only, never the source of a new deadline).
+ * Response and resolution are deliberately separate facts.
  *
  * Events have id, type, evidenceId and an explicit-offset ISO timestamp.
  * Use receivedAt for customer_followup/reopened; sentAt for response_sent;
@@ -172,7 +175,8 @@ function replay(base, events, newEventId = null) {
     resolvedAt: null, events, responseObligations: [], invalidatedEvents: [] };
   const add = (sourceEventId, kind, at) => state.responseObligations.push({
     id: `${kind}:${sourceEventId}`, sourceEventId, kind, startedAt: at,
-    dueAt: plusDay(at), outcome: 'pending', endedAt: null,
+    dueAt: plusDay(at), outcome: 'pending', endedAt: null, endedByEventId: null,
+    previousObligationId: kind === 'recurring' ? state.responseObligations.at(-1)?.id ?? null : null,
   });
   add(base.id, 'initial', base.receivedAt);
   for (const event of events) {
@@ -194,7 +198,7 @@ function replay(base, events, newEventId = null) {
           for (const obligation of state.responseObligations) {
             if (obligation.outcome === 'pending' && (obligation.kind === 'recurring'
                 || addressed.has(obligation.id))) {
-              obligation.outcome = 'responded'; obligation.endedAt = at;
+              obligation.outcome = 'responded'; obligation.endedAt = at; obligation.endedByEventId = event.id;
             }
           }
           add(event.id, 'recurring', at);
@@ -217,7 +221,7 @@ function replay(base, events, newEventId = null) {
           state.invalidatedEvents.push({ eventId: event.id, reason });
           break;
         }
-        recurring.outcome = 'waiting_customer'; recurring.endedAt = at;
+        recurring.outcome = 'waiting_customer'; recurring.endedAt = at; recurring.endedByEventId = event.id;
         state.status = 'waiting_on_customer'; state.owesUpdate = false;
         break;
       }
@@ -232,7 +236,7 @@ function replay(base, events, newEventId = null) {
         }
         for (const obligation of state.responseObligations) {
           if (obligation.outcome === 'pending' && obligation.kind === 'recurring') {
-            obligation.outcome = 'resolved'; obligation.endedAt = at;
+            obligation.outcome = 'resolved'; obligation.endedAt = at; obligation.endedByEventId = event.id;
           }
         }
         state.status = 'resolved'; state.owesUpdate = false; state.resolvedAt = at;

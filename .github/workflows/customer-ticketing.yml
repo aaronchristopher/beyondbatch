@@ -1,0 +1,49 @@
+name: Customer ticketing checks
+
+on:
+  push:
+    branches: [main, 'codex/**']
+    paths: ['modules/customer-ticketing/**', 'package*.json', '.github/workflows/customer-ticketing.yml']
+  pull_request:
+    paths: ['modules/customer-ticketing/**', 'package*.json', '.github/workflows/customer-ticketing.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: customer-ticketing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: beyondbatch_ticketing_test
+          POSTGRES_USER: postgres
+          # Disposable CI service only. No deployed database or secret is used.
+          POSTGRES_PASSWORD: fictional-ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm run check
+      - run: npm run test:ticketing:postgres
+        env:
+          TICKETING_TEST_DATABASE_URL: postgresql://postgres:fictional-ci-only@127.0.0.1:5432/beyondbatch_ticketing_test
+      - run: npm run build:ticketing-review

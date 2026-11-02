@@ -1,5 +1,5 @@
 -- Beyond Batch Requests: PostgreSQL 16+ production foundation.
--- DESIGN MIGRATION ONLY: not applied to a database in this implementation slice.
+-- Validated in disposable development databases; not an applied production DB.
 -- Run once as a dedicated migration owner. This file creates NO roles, grants,
 -- credentials, extensions, mailbox access, or outbound messaging capability.
 -- IDs are application-generated UUIDs; timestamps are absolute instants.

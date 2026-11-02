@@ -8,9 +8,10 @@ The goal is a meaningful customer response within **24 elapsed hours**, with one
 
 ## Run from the repository root
 
-Node.js 24 or later is required for the built-in SQLite fixture harness. There are no external runtime packages and no required installation step for these commands:
+Node.js 24 or later is required for the built-in SQLite fixture harness. Install the pinned workspace dependencies, including the PostgreSQL driver:
 
 ```sh
+npm ci --ignore-scripts
 npm test
 npm run check
 npm run demo:ticketing
@@ -30,7 +31,7 @@ Run either demo server, not both for the same exercise. The ordinary demo prints
 | `src/domain/` | Immutable request events, response obligations, closure and reopening |
 | `src/integrations/` | Scoped read-only Graph adapter, extraction contracts, correlation proposals |
 | `src/security/` | Verified-principal boundary, scoped views and original-email link validation |
-| `src/persistence/` | Transaction/checkpoint contracts and explicitly fictional SQLite stores |
+| `src/persistence/` | Normalized PostgreSQL request store, checkpoint adapter and fictional SQLite stores |
 | `src/fixtures/` | Durable fictional pipeline and local HTTP demonstrations |
 | `public/` | Personal, department and president browser workspace with internal windows |
 | `db/` | Proposed PostgreSQL schema; not an applied production database |
@@ -45,6 +46,7 @@ Run either demo server, not both for the same exercise. The ordinary demo prints
 - Authorized-mailbox Graph reads, metadata delta, immutable IDs, safe cursors, retry handling and checkpoint callbacks. Token acquisition and production callbacks remain to be wired.
 - Provider-neutral extraction validation and conservative cross-thread/cross-mailbox proposals. Uncertainty stays reviewable; model output cannot send or close requests.
 - Durable fictional ingestion, reviewed request creation and Sent-evidence processing across local SQLite restarts. SQLite is a test/demo harness, not the production database.
+- Normalized PostgreSQL request creation, append-only history, exact response evidence, version conflicts, idempotency receipts and atomic outbox writes. This internal store is not yet wired to the website or production identity. Run the separate native integration suite with `npm run test:ticketing:postgres` against an explicitly disposable local database; see [PostgreSQL request persistence](docs/Postgres-Requests.md).
 - A request-level president table with the task and original email subject, plus separate request, history, email-trail and reply-composer windows. The trail and composer use explicitly fictional messages. Draft text remains in session memory; no mail is sent or attachment content uploaded. Open in Outlook supports a verified original-message web link when server-loaded source permissions are available. Current fixtures show the disconnected state. Desktop Classic Outlook requires an additional integration; no native launch is claimed. See [reply flow](docs/Outlook-Reply-Flow.md).
 
 ## Integration with BeyondBatch

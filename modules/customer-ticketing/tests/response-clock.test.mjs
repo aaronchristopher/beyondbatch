@@ -16,6 +16,30 @@ const askingResponse = (overrides = {}) => response({ requestsCustomerInput: tru
 const waiting = (overrides = {}) => ({ id: 'wait1', type: 'waiting_customer', occurredAt: '2026-11-01T17:00:00Z',
   evidenceId: 'question-sent1', responseEventId: 'response1', actor: { id: 'pm1', type: 'human' }, reason: 'Customer must confirm the lot', ...overrides });
 
+test('obligations identify the exact ending event even when partial replies share a timestamp', () => {
+  let request = applyEvent(base(), followup({ receivedAt: '2026-11-01T15:00:00Z' }));
+  request = applyEvent(request, response({ id: 'reply-a', coversAllOutstandingAsks: false,
+    addressedObligationIds: ['initial:r1'] }));
+  request = applyEvent(request, response({ id: 'reply-b', evidenceId: 'sent-b', coversAllOutstandingAsks: false,
+    addressedObligationIds: ['followup:follow1'] }));
+  const byId = Object.fromEntries(request.responseObligations.map(o => [o.id, o]));
+  assert.equal(byId['initial:r1'].endedByEventId, 'reply-a');
+  assert.equal(byId['followup:follow1'].endedByEventId, 'reply-b');
+  assert.equal(byId['recurring:reply-a'].endedByEventId, 'reply-b');
+  assert.equal(byId['recurring:reply-b'].endedByEventId, null);
+  assert.equal(byId['recurring:reply-a'].previousObligationId, 'followup:follow1');
+  assert.equal(byId['recurring:reply-b'].previousObligationId, 'recurring:reply-a');
+  assert.equal(byId['initial:r1'].previousObligationId, null);
+  assert.deepEqual(replayRequest(JSON.parse(JSON.stringify(request))), request);
+});
+
+test('human pause and closure retain their own ending event provenance', () => {
+  const paused = applyEvent(applyEvent(base(), askingResponse()), waiting());
+  assert.equal(paused.responseObligations.at(-1).endedByEventId, 'wait1');
+  const closed = applyEvent(applyEvent(base(), response()), resolution());
+  assert.equal(closed.responseObligations.at(-1).endedByEventId, 'close1');
+});
+
 test('initial clock is exactly 24 elapsed hours, including weekend', () => {
   const request = base();
   assert.equal(request.dueAt, '2026-11-02T14:00:00.000Z');
