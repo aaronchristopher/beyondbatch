@@ -13,6 +13,81 @@ test('production configuration refuses the demo entry point before listening',()
   const result=spawnSync(process.execPath,[fileURLToPath(new URL('../src/server.mjs',import.meta.url)),'--demo'],{env:{...process.env,NODE_ENV:'production'},encoding:'utf8'});
   assert.equal(result.status,1); assert.match(result.stderr,/Production startup is blocked/);
 });
+test('importing the demo factory in production cannot expose a custom provider or managed preview',()=>{
+  const script=`
+    import {createDemoServer} from ${JSON.stringify(new URL('../src/server.mjs',import.meta.url).href)};
+    let providerCalls=0;
+    let error=null;
+    try {
+      createDemoServer({managedPreview:true,allowProduction:true,
+        workspaceProvider:()=>{providerCalls++;return {private:'must not be served'};}});
+    } catch (failure) { error=failure.message; }
+    console.log(JSON.stringify({providerCalls,error}));
+  `;
+  const result=spawnSync(process.execPath,['--input-type=module','-e',script],{
+    env:{...process.env,NODE_ENV:'production',SITES_MANAGED_LINUX_CONTAINER:'1'},encoding:'utf8',timeout:5000});
+  assert.equal(result.status,0,result.stderr);
+  const report=JSON.parse(result.stdout);
+  assert.equal(report.providerCalls,0);
+  assert.match(report.error,/Production startup is blocked/);
+});
+test('an existing demo server refuses every route if its environment becomes production',()=>{
+  const script=`
+    import {createDemoServer} from ${JSON.stringify(new URL('../src/server.mjs',import.meta.url).href)};
+    let providerCalls=0;
+    const server=createDemoServer({managedPreview:true,
+      workspaceProvider:()=>{providerCalls++;return {private:'must not be served'};}});
+    await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+    process.env.NODE_ENV='production';
+    const responses=[];
+    try {
+      for (const path of ['/api/workspace?persona=president','/api/email-trail?persona=president&requestId=r1','/','/health']) {
+        const response=await fetch('http://127.0.0.1:'+server.address().port+path);
+        responses.push({status:response.status,body:await response.text()});
+      }
+    } finally {server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
+    console.log(JSON.stringify({providerCalls,responses}));
+  `;
+  const result=spawnSync(process.execPath,['--input-type=module','-e',script],{
+    env:{...process.env,NODE_ENV:'development'},encoding:'utf8',timeout:5000});
+  assert.equal(result.status,0,result.stderr);
+  const report=JSON.parse(result.stdout);
+  assert.equal(report.providerCalls,0);
+  assert.ok(report.responses.every(response=>response.status===503));
+  assert.ok(report.responses.every(response=>JSON.parse(response.body).error==='Preview unavailable'));
+  assert.ok(!result.stdout.includes('must not be served'));
+});
+test('an in-flight demo provider cannot emit data after the environment becomes production',()=>{
+  const script=`
+    import {createDemoServer} from ${JSON.stringify(new URL('../src/server.mjs',import.meta.url).href)};
+    let providerCalls=0;
+    let signalStarted,releaseProvider;
+    const started=new Promise(resolve=>{signalStarted=resolve;});
+    const released=new Promise(resolve=>{releaseProvider=resolve;});
+    const server=createDemoServer({workspaceProvider:async()=>{
+      providerCalls++;signalStarted();await released;return {private:'must not be served'};
+    }});
+    await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+    let status,body;
+    try {
+      const pending=fetch('http://127.0.0.1:'+server.address().port+'/api/workspace?persona=president');
+      await started;
+      process.env.NODE_ENV='production';
+      releaseProvider();
+      const response=await pending;
+      status=response.status;body=await response.text();
+    } finally {server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
+    console.log(JSON.stringify({providerCalls,status,body}));
+  `;
+  const result=spawnSync(process.execPath,['--input-type=module','-e',script],{
+    env:{...process.env,NODE_ENV:'development'},encoding:'utf8',timeout:5000});
+  assert.equal(result.status,0,result.stderr);
+  const report=JSON.parse(result.stdout);
+  assert.equal(report.providerCalls,1);
+  assert.equal(report.status,503);
+  assert.deepEqual(JSON.parse(report.body),{error:'Preview unavailable'});
+  assert.ok(!result.stdout.includes('must not be served'));
+});
 test('PM sees only own/backup work; president sees explicitly scoped operational requests',()=>{
   assert.equal(workspace(demoPrincipals.pm).requests.length,3);
   assert.equal(workspace(demoPrincipals.president).requests.length,6);

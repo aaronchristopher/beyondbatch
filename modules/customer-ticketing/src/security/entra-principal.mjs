@@ -1,5 +1,10 @@
 /**
- * Credential-independent Entra API principal boundary.
+ * LEGACY development-only delegated Entra API principal boundary.
+ *
+ * SAML 2.0 with enforced Entra MFA supersedes this proposed human-login flow.
+ * Construction and resolution are disabled in production. This retained fixture
+ * boundary is not a SAML implementation and must never be wired as a fallback
+ * for production user sessions. Workload Graph credentials are a separate path.
  *
  * This module does NOT implement JWT signature verification or sign-in. The
  * injected verifyAccessToken MUST perform cryptographic verification using a
@@ -29,6 +34,9 @@ export class PrincipalResolutionError extends Error {
 const unauthenticated = () => new PrincipalResolutionError('INVALID_ACCESS_TOKEN', 401);
 const denied = () => new PrincipalResolutionError('PRINCIPAL_ACCESS_DENIED', 403);
 const unavailable = () => new PrincipalResolutionError('AUTH_DEPENDENCY_UNAVAILABLE', 503);
+function requireLegacyDevelopmentEnvironment() {
+  if (process.env.NODE_ENV === 'production') throw new PrincipalResolutionError('LEGACY_BEARER_DISABLED', 503);
+}
 
 function plain(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -132,6 +140,7 @@ function mapPrincipal(row, identity, nowMs) {
  */
 export function createPrincipalResolver({ tenantId, audience, issuer, verifyAccessToken,
   loadPrincipal, requiredScope = 'access_as_user', clock = () => new Date() } = {}) {
+  requireLegacyDevelopmentEnvironment();
   const approvedTenantId = uuid(tenantId);
   if (!approvedTenantId) configError('tenantId');
   if (!nonempty(audience, 2048)) configError('audience');
@@ -146,6 +155,7 @@ export function createPrincipalResolver({ tenantId, audience, issuer, verifyAcce
   const policy = freeze({ tenantId: approvedTenantId, audience, issuer, requiredScope,
     tokenUse: 'access_token', clockToleranceSeconds: 0 });
   return async function resolvePrincipal(rawAccessToken) {
+    requireLegacyDevelopmentEnvironment();
     // HTTP adapter extracts a single Authorization: Bearer value. Headers, cookies,
     // query personas and decoded principal objects are never accepted here.
     if (typeof rawAccessToken !== 'string' || !rawAccessToken.length || rawAccessToken.length > 16_384
@@ -164,6 +174,7 @@ export function createPrincipalResolver({ tenantId, audience, issuer, verifyAcce
     // Recheck time after asynchronous dependencies; don't return an already expired identity.
     const authorizationTime = readNow(clock);
     if (identity.expiresAtSeconds <= authorizationTime.seconds) throw unauthenticated();
+    requireLegacyDevelopmentEnvironment();
     return mapPrincipal(row, identity, authorizationTime.ms);
   };
 }

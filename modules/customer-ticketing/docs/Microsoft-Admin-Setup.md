@@ -13,11 +13,19 @@ This guide prepares a concrete approval package. Nothing in this build creates a
 | Credential | Approved workload federation/managed identity arrangement where supported, or certificate protected in Key Vault; owner and rotation/revocation procedure |
 | Mailbox scope | Exact Entra mailbox object GUIDs, purpose, pilot owner, dates and review date; no implicit “everyone” |
 | Processing scope | Approved customers, folders, metadata baseline, content lookback, sensitive exclusions and retention |
-| Interactive users | Separate Entra sign-in registration, named app roles and customer/department grants; no shared-user login |
+| Interactive users | Separate SAML 2.0 enterprise app; mandatory MFA/Conditional Access, assignment and application database grants; no shared-user or alternate app login |
 | Infrastructure | Approved subscription/region, private evidence store, database, queue, operational ownership and cost limit |
 | External inference | Provider, geography, retention/DPA and permitted content approval before any real email reaches a model |
 
 Do not put certificates, client secrets, access tokens or actual customer bodies in source, screenshots, logs or fixtures. The token-provider implementation is a separate production dependency. It must obtain tokens from the approved tenant for `https://graph.microsoft.com/.default`; the reader does not authenticate arbitrary user-supplied tokens or infer the tenant from email domains.
+
+## 1a. Human SAML/MFA configuration — separate from the reader
+
+The November 2 security requirement supersedes earlier OIDC/bearer sign-in proposals. Prepare a separate human SAML enterprise application with fixed HTTPS ACS/entity ID, approved Entra signing certificates, signed AuthnRequests with verification enforced, immutable tenant/object-ID claims and verified signed MFA-method claims. Require assignment plus the application's own active scoped grants. Configure app-scoped Conditional Access with enforced phishing-resistant MFA and reviewed sign-in-frequency/session behavior; report-only testing does not enforce access. No other provider or bearer route may create a Customer Ticketing user session.
+
+Review the exact app, user/group assignments, certificate ownership/rotation, authentication-method enrollment, policy scope and session/revocation tests before applying changes. Any directory-read permission needed for timely account/assignment revocation is a separate minimum-scope approval. Do not alter tenant-wide access or duplicate/broaden the existing reader registration. Workload Graph credentials remain separate from human SAML sessions.
+
+See [Security SAML Access](Security-SAML-Access.md) for the configuration contract, official Microsoft references and mandatory deployed acceptance matrix. No SAML service, MFA policy or private-data deployment is enabled by this setup document.
 
 ## 2. Recommended Exchange authorization
 

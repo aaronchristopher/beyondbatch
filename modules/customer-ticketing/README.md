@@ -6,6 +6,8 @@ The goal is a meaningful customer response within **24 elapsed hours**, with one
 
 **Current state: tested development code using fictional data.** Live Microsoft mail, complete production sign-in, production PostgreSQL wiring and native Classic Outlook launch are not connected. Production startup is deliberately blocked. See [implementation status](docs/Implementation-Status.md) and [release gates](docs/Production-Readiness.md).
 
+**Required live access: exclusive UniWell Entra SAML 2.0 with enforced MFA.** Every private-data route must also enforce current resource permissions. Demo factories and the legacy bearer prototype reject production use; these safeguards do not implement SAML. See [security and acceptance contract](docs/Security-SAML-Access.md).
+
 ## Run from the repository root
 
 Node.js 24 or later is required for the built-in SQLite fixture harness. Install the pinned workspace dependencies, including the PostgreSQL driver:
@@ -30,7 +32,7 @@ Run either demo server, not both for the same exercise. The ordinary demo prints
 |---|---|
 | `src/domain/` | Immutable request events, response obligations, closure and reopening |
 | `src/integrations/` | Scoped read-only Graph adapter, extraction contracts, correlation proposals |
-| `src/security/` | Verified-principal boundary, scoped views and original-email link validation |
+| `src/security/` | Scoped views, source-link validation and a legacy development-only principal prototype; production SAML is pending |
 | `src/persistence/` | Normalized PostgreSQL request store, checkpoint adapter and fictional SQLite stores |
 | `src/fixtures/` | Durable fictional pipeline and local HTTP demonstrations |
 | `public/` | Personal, department and president browser workspace with internal windows |

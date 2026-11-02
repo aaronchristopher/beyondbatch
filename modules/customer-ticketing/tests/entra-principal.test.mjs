@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPrincipalResolver, PrincipalResolutionError } from '../src/security/entra-principal.mjs';
 import { canReadRequest } from '../src/security/workspace.mjs';
+import { spawnSync } from 'node:child_process';
 
 // Boundary tests use an explicitly injected verifier double. They do NOT prove a
 // real JWT's signature, JWKS rotation, live Entra consent, or deployed SSO.
@@ -34,6 +35,63 @@ function setup({ claimPatch, verification, row, verifier, loader, clock, ...conf
 async function deniedWith(resolve, token = 'opaque-access-token', status = 401) {
   await assert.rejects(resolve(token), error => error instanceof PrincipalResolutionError && error.statusCode === status);
 }
+
+function legacyProductionProbe(body, environment) {
+  const script=`
+    import {createPrincipalResolver} from ${JSON.stringify(new URL('../src/security/entra-principal.mjs',import.meta.url).href)};
+    const seen={verify:0,load:0};
+    const options={tenantId:${JSON.stringify(tid)},audience:${JSON.stringify(audience)},issuer:${JSON.stringify(issuer)},
+      allowProduction:true,clock:()=>new Date(${JSON.stringify(now)}),
+      verifyAccessToken:async()=>{seen.verify++;return ${JSON.stringify({tokenUse:'access_token',claims:claims()})};},
+      loadPrincipal:async()=>{seen.load++;return ${JSON.stringify(principal())};}};
+    ${body}
+  `;
+  const result=spawnSync(process.execPath,['--input-type=module','-e',script],{
+    env:{...process.env,NODE_ENV:environment},encoding:'utf8',timeout:5000});
+  assert.equal(result.status,0,result.stderr);
+  return JSON.parse(result.stdout);
+}
+
+test('legacy bearer resolver construction is disabled in production even with valid dependencies',()=>{
+  const report=legacyProductionProbe(`
+    let failure=null;
+    try {createPrincipalResolver(options);} catch(error) {failure={code:error.code,status:error.statusCode};}
+    console.log(JSON.stringify({seen,failure}));
+  `,'production');
+  assert.deepEqual(report,{seen:{verify:0,load:0},failure:{code:'LEGACY_BEARER_DISABLED',status:503}});
+});
+
+test('legacy bearer resolution is disabled if production starts after resolver construction',()=>{
+  const report=legacyProductionProbe(`
+    const resolve=createPrincipalResolver(options);
+    process.env.NODE_ENV='production';
+    let failure=null;
+    try {await resolve('opaque-access-token');} catch(error) {failure={code:error.code,status:error.statusCode};}
+    console.log(JSON.stringify({seen,failure}));
+  `,'development');
+  assert.deepEqual(report,{seen:{verify:0,load:0},failure:{code:'LEGACY_BEARER_DISABLED',status:503}});
+});
+
+test('an in-flight legacy principal loader cannot return a principal after production starts',()=>{
+  const report=legacyProductionProbe(`
+    let signalStarted,releaseLoader;
+    const started=new Promise(resolve=>{signalStarted=resolve;});
+    const released=new Promise(resolve=>{releaseLoader=resolve;});
+    const originalLoader=options.loadPrincipal;
+    options.loadPrincipal=async input=>{
+      const row=await originalLoader(input);signalStarted();await released;return row;
+    };
+    const resolve=createPrincipalResolver(options);
+    let failure=null,resolved=null;
+    const pending=resolve('opaque-access-token');
+    await started;
+    process.env.NODE_ENV='production';
+    releaseLoader();
+    try {resolved=await pending;} catch(error) {failure={code:error.code,status:error.statusCode};}
+    console.log(JSON.stringify({seen,failure,resolved}));
+  `,'development');
+  assert.deepEqual(report,{seen:{verify:1,load:1},failure:{code:'LEGACY_BEARER_DISABLED',status:503},resolved:null});
+});
 
 test('requires explicit cryptographic verifier and DB loader; has no decode or fixture fallback', () => {
   assert.throws(() => createPrincipalResolver({ tenantId: tid, audience, issuer, loadPrincipal() {} }), /verifyAccessToken/);

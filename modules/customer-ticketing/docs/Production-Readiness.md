@@ -1,6 +1,6 @@
 # Production readiness — Beyond Batch Requests
 
-**November 1, 2026 · Unmet gates remain unchecked.** This file is the release checklist for a controlled pilot and later organization-wide expansion. Local fixtures, mock Graph responses, a migration file and a passing test command are development evidence; they do not establish Microsoft access, deployed identity, persistence, model quality or production readiness.
+**Updated November 2, 2026 · Unmet gates remain unchecked.** This file is the release checklist for a controlled pilot and later organization-wide expansion. Local fixtures, mock Graph responses, a migration file and a passing test command are development evidence; they do not establish Microsoft access, deployed identity, persistence, model quality or production readiness.
 
 ## What this repository establishes
 
@@ -14,7 +14,10 @@ Every gate needs a named owner, dated result and evidence link in the release re
 
 ### 1. Approved identities and scope — Exchange/Entra + security owners
 
-- [ ] Single-tenant Entra sign-in is integrated server-side with token issuer/audience/tenant validation, secure sessions and current user/role enforcement. An unapproved tenant/user is denied.
+- [ ] Exclusive UniWell Entra **SAML 2.0** sign-in is integrated using a maintained SP and exact issuer/audience/ACS/certificate trust, signed requests/responses/assertions, browser correlation and shared one-time replay checks. No OIDC, local-password, magic-link, bearer-token or proxy-header human-login fallback exists in the production image.
+- [ ] App-scoped Conditional Access **enforces MFA/authentication strength** for every permitted user. Signed MFA evidence is validated; missing evidence denies session creation. Assignment and database allowlists deny unapproved users, including otherwise privileged tenant administrators. Report-only policy is insufficient.
+- [ ] Opaque server sessions, secure cookies, CSRF, idle/absolute/authentication-age bounds, logout and current-grant checks are verified. Directory disable/assignment removal and incident session invalidation meet measured approved revocation bounds. Required dependency failure denies access.
+- [ ] Every test in [Security SAML Access](Security-SAML-Access.md) has deployed evidence: two-account success/denial, forged/replayed assertions, direct API/download/default-host/origin access, spoofed headers, expired/revoked cookies and cross-customer data requests. Independent security review is complete before any private email is introduced.
 - [ ] Dedicated ingestion identity and explicitly approved mailbox/folder inventory exist. Exchange Application RBAC grants the needed `Application Mail.Read` scope. Effective permissions have been inspected for additive broad Entra mail grants; no unscoped grant bypasses the allowlist.
 - [ ] Positive read test for approved mailbox and negative read test for excluded mailbox pass using the actual application identity. UI filtering is not accepted as mailbox scoping.
 - [ ] Incoming, personal Sent Items and shared send-as/on-behalf paths are tested. Any shared-mailbox copy-setting change has separate approval. Remaining gaps are listed to users; inaccessible archive/protected content is not claimed as covered.
@@ -27,6 +30,7 @@ Every gate needs a named owner, dated result and evidence link in the release re
 - [ ] HR, legal, personal and unrelated sensitive material is absent from ordinary lists, search snippets, aggregate counts, exports, caches and AI prompts. A mixed sensitive/business message receives restricted review or an approved redacted projection.
 - [ ] Scope revocation is effective on API reads, downloads, background jobs and queued AI work. No unauthorized fallback provider or broader mailbox scope is used after an error.
 - [ ] Demo impersonation/header/query shortcuts are absent from production paths; the development harness refuses production configuration.
+- [ ] Attachments and exports require current authorization; storage is private. No customer content exists in public/static build artifacts, shared caches, diagnostics or unprotected staging. Default hosting/origin routes cannot bypass the same session/resource checks.
 
 ### 3. Durable evidence and recovery — backend/operations owners
 
@@ -86,7 +90,7 @@ These minimal screening targets narrow the first-wave release; they do not repla
 | Priority | Work package | Depends on | Acceptance evidence |
 |---|---|---|---|
 | P0 | Name policy, technical and duty owners; approve pilot scope and 24-hour coverage | Sponsor decisions | Signed scope/visibility/mapping and duty matrix |
-| P0 | Entra identity + server authorization; remove demo identities from deployable path | Approved app registration | Two-account and excluded-tenant access tests |
+| P0 | Exclusive Entra SAML 2.0 + enforced MFA + server authorization; exclude demo/legacy auth | Approved SAML app, certificates, assignment and app-scoped Conditional Access | Full SAML, revocation, direct-route and two-account acceptance matrix |
 | P0 | Provision approved PostgreSQL/Service Bus/Blob/Key Vault; wire persistence/outbox | Hosting approval | Restart/replay, migration and isolated restore results |
 | P0 | Complete scoped Graph ingestion and actual tenant sent-path coverage | Exchange grant | Positive/negative mailbox tests; baseline/coverage inventory |
 | P0 | Durable scheduling, webhook renewal, five-minute recognition and hourly recovery | Persistence + Graph | Lost notification, expired token, throttling and crash scenarios |
