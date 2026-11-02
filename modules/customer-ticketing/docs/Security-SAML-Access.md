@@ -1,8 +1,8 @@
-# Exclusive SAML 2.0 access and mandatory MFA
+# Exclusive SAML 2.0, mandatory MFA and VPN access
 
 **Decision: November 2, 2026. Required before any live customer email.** This supersedes the earlier OIDC/delegated-bearer proposal for human application access. It is an implementation contract, not a claim that SAML, Conditional Access or production hosting is already configured.
 
-UniWell employees must enter Customer Ticketing through UniWell Microsoft Entra SAML 2.0 single sign-on with enforced multifactor authentication. Successful authentication alone does not authorize a customer, message or attachment. The application separately checks active database grants for each resource. No local-password, email-link, social-login, personal-token, demo-persona or delegated-bearer fallback may unlock private application data.
+The target application domain is `https://beyondbatch.com`. UniWell employees must enter Customer Ticketing from the approved VPN/SASE public exit addresses and through UniWell Microsoft Entra SAML 2.0 single sign-on with enforced multifactor authentication. The network requirement applies to every request, including an already authenticated session; see [Network Access](Network-Access.md). Successful authentication alone does not authorize a customer, message or attachment. The application separately checks active database grants for each resource. No local-password, email-link, social-login, personal-token, demo-persona or delegated-bearer fallback may unlock private application data.
 
 ## Current evidence and remaining boundary
 
@@ -14,6 +14,7 @@ The SAML service-provider wrapper, shared PostgreSQL auth store, opaque session 
 
 | Boundary / attack | Required control |
 |---|---|
+| Off-VPN request or replay of a session outside the allowed network | Mandatory exact-IP policy on every handled request; approved proxy/origin path; no forwarded-header bypass |
 | Anonymous visitor or stolen password | Exclusive SAML sign-in; Entra MFA policy enforced, not report-only; independently validated signed MFA evidence |
 | Forged, replayed or misdirected SAML | Maintained validator; exact trust configuration; request correlation; one-time assertion cache; signed response and assertion |
 | Valid employee accessing another customer's mail | Active immutable identity mapping plus resource authorization on every read and write |
@@ -43,6 +44,12 @@ Set **Assignment required = Yes** and assign only approved users or a reviewed g
 
 Do not weaken tenant-wide emergency recovery policy to implement this app. Emergency administrator accounts have no application data grant or alternate login; infrastructure recovery remains separately privileged, MFA-protected where applicable, time-bound and audited. Administrators who can change infrastructure are a privileged trust boundary, not something a login form can make impossible.
 
+## Required VPN/public-IP boundary
+
+The SAML HTTP handler requires an explicit, valid network allowlist at construction and denies every handled request from an unapproved address before authentication/session processing. Direct mode trusts only the socket peer. Proxy-only mode requires an exact configured peer and one overwritten `x-bb-client-ip` value; it never falls back to direct access or arbitrary forwarded headers. Preserve TLS to the origin and exact Host validation. Restrict alternate origins and prove the proxy deployment cannot be impersonated by other tenants sharing provider infrastructure.
+
+Require a separate Entra network restriction alongside MFA. A trusted IP cannot exempt MFA, and sign-in-time network policy does not substitute for this request gate. An IP match alone cannot prove VPN use when office traffic shares the same exit. The parser supports local/private fixture and proxy addresses; production client allowlists must be verified dedicated public exits. No live DNS, VPN, firewall or tenant policy is changed by the implementation. Deployment, routing, capacity and browser acceptance remain open; [Network Access](Network-Access.md) defines the exact contract.
+
 ## Sessions, logout and revocation
 
 - Issue a cryptographically random opaque session ID after full SAML/MFA/authorization checks. Store only its hash and bounded identity/authentication metadata server-side. Rotate at login and privilege transitions. Never place assertions, Graph tokens or application credentials in browser local storage or URLs.
@@ -56,7 +63,7 @@ Do not weaken tenant-wide emergency recovery policy to implement this app. Emerg
 
 HTML containing private data, JSON APIs, counts, search suggestions/results, email trails, attachment bytes, exports, SSE/WebSockets and background-result retrieval all require a live authorized session. Apply object-level checks before reading/serializing private content. Guessing IDs, changing query parameters, sending `Authorization: Bearer`, or spoofing `x-ms-client-principal`/forwarded identity headers cannot establish identity.
 
-The only unauthenticated surface is a strict allowlist: sign-in initiation, SAML ACS/metadata as needed, static non-sensitive assets and minimal health without data or infrastructure details. Protocol webhooks have independent subscription/clientState verification and bounded durable enqueue; they expose no application data reads or session creation. Never trust webhook email content as authorization.
+The only unauthenticated surface is a strict allowlist: sign-in initiation, SAML ACS/metadata as needed, static non-sensitive assets and minimal health without data or infrastructure details. Unauthenticated does not mean network-exempt: all ordinary application endpoints remain VPN-gated, including the browser-posted ACS. The implemented handler also gates health; infrastructure probes need an approved separate transport or compatible source path, not a broad application bypass. Protocol webhooks have independent subscription/clientState verification and bounded durable enqueue; they expose no application data reads or session creation. Never trust webhook email content as authorization.
 
 Restrict origin ingress to the approved edge and enforce application authorization even there. Test the main domain, default hosting hostname, API domain and any reachable origin address independently. Configure proxy trust explicitly and strip client-supplied identity/forwarding headers. Protect staging and backup/restore environments equally if they hold private content. No private data in static review JSON, source maps, public artifacts, diagnostic pages or shared/CDN caches; use `Cache-Control: no-store` for private responses.
 
@@ -74,7 +81,10 @@ Require TLS in transit, encrypted database/object storage and backups, private n
 
 | Test | Expected result |
 |---|---|
-| Approved user, valid SAML plus enforced MFA, permitted customer | Only assigned view and authorized evidence succeeds |
+| Valid session cookie after VPN disconnect; forged forwarded client address | Next request is denied before session/resource work; no new private bytes |
+| Untrusted proxy peer, duplicate/missing/chained dedicated address header | Denied; no direct-address fallback |
+| IPv6, split routing, VPN failover and shared office egress | Only verified approved exits succeed; actual tunnel requirement demonstrated |
+| Approved VPN exit and user, valid SAML plus enforced MFA, permitted customer | Only assigned view and authorized evidence succeeds |
 | Password-only, missing MFA claim, wrong tenant or unassigned user/admin | No application session/data |
 | Unsigned, altered, expired, wrong audience/destination, wrapping or replay assertion | Rejected; no session; bounded audit event |
 | Unsolicited/IdP-initiated response or stolen login state from another browser | Rejected |
@@ -92,8 +102,8 @@ Run real two-account browser acceptance and independent security review of SAML,
 ## Configuration changes needing a concrete approval package
 
 1. A **separate human SAML enterprise application**: exact host/entity ID/ACS, signing and request-verification certificates, immutable identity/MFA claims, assigned users/group and certificate custody/rotation. Reuse the existing reader identity for ingestion; do not duplicate or broaden it.
-2. App-scoped Conditional Access enforcement, authentication strength, sign-in frequency, assigned population and enrollment/recovery verification. Test report-only first with fictional data; enforcement must be On before private data.
-3. Exact hosting/origin/network restrictions, session store, database/storage roles, secrets, retention, audit and operational access. Identify any minimum directory-read permission needed for eligibility freshness separately.
+2. App-scoped Conditional Access enforcement requiring both approved network and MFA authentication strength, sign-in frequency, assigned population and enrollment/recovery verification. Test report-only first with fictional data; enforcement must be On before private data.
+3. Verified domain control, DNS/certificate changes, exact VPN public exits, dedicated proxy/header contract, private origin/bypass restrictions, session store, database/storage roles, secrets, retention, audit and operational access. Identify any minimum directory-read permission needed for eligibility freshness separately.
 4. Evidence that assignment, MFA, revocation, direct-route and cross-customer tests pass before authorizing live customer content.
 
 No such changes, credentials, deployment, email connection or outbound messages are made by this document or the demo guards.

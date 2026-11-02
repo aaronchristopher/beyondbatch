@@ -1,8 +1,10 @@
 /**
  * HTTPS-only SAML transport boundary. This does not listen, configure Microsoft,
  * or attach customer-data routes. Compose only with the reviewed SAML manager
- * and shared limiter; neither may be selected from request input.
+ * and shared limiter; neither may be selected from request input. The network
+ * policy is mandatory trusted configuration, independent of SAML identity.
  */
+import { createNetworkAccessPolicy } from './network-access.mjs';
 const SESSION_COOKIE='__Host-bb-session',LOGIN_COOKIE='__Host-bb-login';
 const MAX_BODY=180*1024, BODY_TIMEOUT_MS=5000, DEPENDENCY_TIMEOUT_MS=10000;
 const CLEAR_SESSION=`${SESSION_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0`;
@@ -147,13 +149,16 @@ function sessionProjection(result) {
     csrfToken:result.csrfToken,expiresAtMs:result.expiresAtMs,reauthAtMs:result.reauthAtMs};
 }
 
-export function createSamlAuthHandler({manager,publicOrigin,rateLimit,audit}={}) {
+export function createSamlAuthHandler({manager,publicOrigin,rateLimit,audit,networkAccess}={}) {
   let origin;try{origin=new URL(publicOrigin);}catch{throw new TypeError('Invalid public origin');}
   if(typeof publicOrigin!=='string'||publicOrigin!==origin.origin||origin.protocol!=='https:'||origin.username||origin.password)throw new TypeError('Invalid public origin');
   if(!manager||!['startLogin','finishLogin','authenticate','logout'].every(key=>typeof manager[key]==='function')
       ||typeof rateLimit!=='function'||typeof audit!=='function')throw new TypeError('SAML manager, shared rate limiter and audit sink are required');
+  // No callback/default that could silently bypass the required network gate.
+  const networkPolicy=createNetworkAccessPolicy(networkAccess);
   return async function samlAuthHandler(req,res) {
     const auditRoute=Object.hasOwn(REQUIRED_METHODS,req.url)?req.url:'unknown';
+    let networkDenied=false;
     const respond=(status,body=null,extra={})=>{
       if(res.destroyed||res.writableEnded)return;
       res.writeHead(status,{...HEADERS,...(body===null?{}:{'Content-Type':'application/json; charset=utf-8'}),...extra});
@@ -163,6 +168,9 @@ export function createSamlAuthHandler({manager,publicOrigin,rateLimit,audit}={})
       if(!Array.isArray(req.rawHeaders)||req.rawHeaders.length>200
           ||req.rawHeaders.reduce((total,value)=>total+Buffer.byteLength(String(value)),0)>16384)fail(400);
       if(req.socket?.encrypted!==true||oneHeader(req,'host')!==origin.host)fail(403);
+      let clientKey;
+      try {clientKey=networkPolicy.authorize(req);}
+      catch {networkDenied=true;fail(403);}
       rejectAlternateIdentity(req);
       if(typeof req.url!=='string'||req.url.length>2048||!req.url.startsWith('/')||req.url.startsWith('//')||req.url.includes('#'))fail(400);
       const url=new URL(req.url,publicOrigin);
@@ -172,8 +180,6 @@ export function createSamlAuthHandler({manager,publicOrigin,rateLimit,audit}={})
       }
       if(url.pathname==='/health'){noBody(req);return respond(200,{ready:false,mode:'saml-integration'});}
       const scope={'/auth/saml/login':'login','/auth/saml/acs':'acs','/auth/session':'session','/auth/logout':'logout'}[url.pathname]??'data';
-      const clientKey=req.socket.remoteAddress;
-      if(typeof clientKey!=='string'||!clientKey||clientKey.length>128)fail(503);
       if(await bounded(rateLimit({scope,clientKey}))!==true)fail(429);
       if(url.pathname==='/auth/saml/login') {
         noBody(req);const requestOrigin=oneHeader(req,'origin');if(requestOrigin!==undefined&&requestOrigin!==publicOrigin)fail(403);
@@ -208,7 +214,8 @@ export function createSamlAuthHandler({manager,publicOrigin,rateLimit,audit}={})
     } catch(error) {
       let status=Number.isInteger(error?.statusCode)&&Object.hasOwn(MESSAGES,error.statusCode)?error.statusCode:503;
       try {
-        await bounded(audit(Object.freeze({type:'auth.http_denied',statusCode:status,at:new Date().toISOString(),route:auditRoute})));
+        await bounded(audit(Object.freeze({type:'auth.http_denied',statusCode:status,at:new Date().toISOString(),route:auditRoute,
+          ...(networkDenied?{reason:'network'}:{})})));
       } catch {status=503;}
       // Close rejected body streams; do not leave the process buffering input.
       return respond(status,{error:MESSAGES[status]},{...(req.method==='POST'?{Connection:'close'}:{}),
