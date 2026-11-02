@@ -11,6 +11,9 @@ const assets = { '/':['index.html','text/html; charset=utf-8'], '/app.js':['app.
 
 /** A read-only loopback development harness. Production intentionally cannot start. */
 export function createDemoServer({requests=makeFixtures(), clock=()=>new Date(), managedPreview=false, workspaceProvider=null} = {}) {
+  // Guard the exported factory as well as the CLI: an importing host must not
+  // attach production records to the unauthenticated fixture persona routes.
+  if (process.env.NODE_ENV === 'production') throw new Error('Production startup is blocked: the fictional demo cannot serve production data.');
   if (workspaceProvider !== null && typeof workspaceProvider !== 'function') throw new TypeError('workspace provider must be a function');
   return createServer(async (req,res) => {
     const headers = {
@@ -19,8 +22,14 @@ export function createDemoServer({requests=makeFixtures(), clock=()=>new Date(),
       'Referrer-Policy':'no-referrer', 'Cross-Origin-Resource-Policy':'same-origin',
     };
     const respond = (status,body,type='application/json; charset=utf-8') => {
+      // Also fail closed if the environment changes while an async provider or
+      // asset read is pending. This is a demo safeguard, not SAML authentication.
+      if (process.env.NODE_ENV === 'production') {
+        status=503; body={error:'Preview unavailable'}; type='application/json; charset=utf-8';
+      }
       res.writeHead(status,{...headers,'Content-Type':type}); res.end(type.startsWith('application/json') ? JSON.stringify(body) : body);
     };
+    if (process.env.NODE_ENV === 'production') return respond(503,{error:'Preview unavailable'});
     // Prevent arbitrary websites from reading or embedding an unauthenticated local preview.
     const allowedHost = managedPreview ? /^(127\.0\.0\.1|localhost|terminal\.local)(:\d+)?$/ : /^(127\.0\.0\.1|localhost)(:\d+)?$/;
     if (!allowedHost.test(req.headers.host || '')) return respond(403,{error:'Approved preview host required'});

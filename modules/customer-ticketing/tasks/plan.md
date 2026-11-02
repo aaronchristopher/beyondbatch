@@ -4,7 +4,7 @@ Updated November 2, 2026. This extends the same project plan. All code remains i
 
 ## Verified starting point
 
-The private fictional interface has task/email-subject columns, linked email-trail windows, session-only reply drafts and a secondary Open in Outlook action. Source is merged through PR 3. The domain/access/adapter foundations have 217 passing tests. The normalized PostgreSQL request store also passed 20 native PostgreSQL integration scenarios; a production database is not connected. Production sign-in, real mail, model inference and sending are not connected. Automated tests do not establish real-mail accuracy. Visual interaction acceptance remains open because the managed browser preview route was unavailable.
+The private fictional interface has task/email-subject columns, linked email-trail windows, session-only reply drafts and a secondary Open in Outlook action. The PostgreSQL backend is merged through PR 5. The current domain/access/adapter foundations and production guards have 223 passing tests. The normalized PostgreSQL request store also passed 20 native PostgreSQL integration scenarios; a production database is not connected. Production SAML/MFA sign-in, real mail, model inference and sending are not connected. Automated tests do not establish real-mail accuracy. Visual interaction acceptance remains open because the managed browser preview route was unavailable.
 
 The dedicated Microsoft reader app has already been registered, and the user supplied the initial mailbox roster including a corrected entry. Do not ask for these again or create a duplicate reader registration. Exchange mailbox resolution, scoped grants, the shared project-management address's actual type and customer-to-PM/backup mappings still need verification. The first operational scope is all named approved mailboxes; two unnamed possible additions remain excluded. A one-mailbox smoke test does not narrow that scope.
 
@@ -25,7 +25,7 @@ The milestone sequence is a dependency order, not a promise that every stage can
 
 - Retain Azure, Entra, Microsoft Graph and PostgreSQL as the production target. Reuse existing BeyondBatch infrastructure where verified; prepare an exact resource/budget proposal before new billable resources are created.
 - Build one complete saved-request path first. Test the normalized PostgreSQL mapping against real disposable PostgreSQL, not only scripted clients or SQLite. The closure/reopening write order must satisfy the schema's constraints.
-- Resolve identity from verified server sessions and current database grants. Never ship the demo persona switch as access control. Executive summary rights are separate from source-email and sending rights.
+- Human access is exclusively UniWell Entra **SAML 2.0 with enforced MFA**, followed by opaque server sessions and current database grants. This supersedes the earlier OIDC/bearer proposal. No alternate sign-in or demo persona path may reach private data. Protect APIs, attachments, exports and direct hosting origins as well as the UI. Executive summary rights remain separate from source-email and sending rights. See [Security SAML Access](../docs/Security-SAML-Access.md).
 - One ingestion service owns independent durable jobs per approved mailbox/folder. Store evidence and continuation checkpoints safely; report coverage gaps and stale sync. Initial live backfill/lookback and retention require a concrete policy before ingesting bodies.
 - The provider-neutral extraction contract remains. Benchmark an approved provider on labeled requests; no claim that JEV or OpenAI is more accurate without results. Secure provider credentials are introduced only when this stage is ready.
 - Distinct requests remain distinct even within one email. Correlation uses message links and customer/product/order evidence; subject similarity alone cannot merge. All proposed merges and ownership changes retain provenance and review history.
@@ -39,6 +39,7 @@ Detailed acceptance criteria, dependencies and file boundaries are in `todo.md`.
 ## Inputs and approvals at the point they are needed
 
 - **Hosting:** actual subscription/resource group, region, private runtime URL and approved spend before creating resources. The previously entered budget alert is not a spending cap or approved operating estimate.
+- **Human identity:** separate SAML enterprise app, exact entity ID/ACS, certificate custody, assignment, MFA claims and app-scoped Conditional Access enforcement. Session/revocation and deployed bypass tests must pass before private email ingestion; the existing reader registration is separate and remains unchanged.
 - **Microsoft read access:** exact verified mailbox scope and credential method before granting application read access. The registered app alone does not establish permission.
 - **Business mapping:** customer → primary PM → backup, department queue owners and 24-hour duty coverage. Import an existing authorized mapping where available, then review exceptions.
 - **Data processing:** eligible lookback/folders, sensitive exclusions, retention and provider privacy settings before live content processing.

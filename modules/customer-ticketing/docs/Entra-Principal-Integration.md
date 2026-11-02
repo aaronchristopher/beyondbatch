@@ -1,17 +1,20 @@
-# Entra principal resolution boundary
+# Legacy delegated-token principal prototype
 
-**November 2, 2026 · Implemented adapter boundary; production sign-in is not connected.**
+**Superseded November 2, 2026. Development-only; disabled in production.** Human application access must use **SAML 2.0 with enforced Entra MFA**, according to [Security SAML Access](Security-SAML-Access.md). This file preserves the historical token/DB contract for existing fixture tests. It is not a production integration recipe. Do not wire this resolver, a bearer-token API login, or platform OIDC authentication as a fallback to SAML.
+
+Construction and resolution now fail with `LEGACY_BEARER_DISABLED` (503) when `NODE_ENV=production`, including a final check after asynchronous dependencies. Exclude this module from the production image. Environment checks are accident-prevention guards, not authentication. The future SAML adapter may reuse the immutable identity and current database-grant policy described below, but must establish identity from a cryptographically validated SAML session instead.
 
 `src/security/entra-principal.mjs` provides a reusable server-side mapping from a cryptographically verified API access token to an active, explicitly authorized database principal. It does not implement signature verification, acquire tokens, configure Microsoft applications, provision permissions, connect PostgreSQL, or authenticate the existing fictional review UI. No credentials, tenant changes or external deployment are supplied by this module.
 
 ## Public interface
 
 ```js
+// Historical development contract only; never wire into a production HTTP route.
 const resolvePrincipal = createPrincipalResolver({
   tenantId: approvedEntraTenantUuid,
   audience: configuredApiAudience,
   issuer: exactTrustedEntraIssuer,
-  verifyAccessToken: productionCryptographicVerifier,
+  verifyAccessToken: testOnlyVerifier,
   loadPrincipal: databasePrincipalLoader,
   requiredScope: 'access_as_user', // default; configure to the actual exposed API scope
   clock: () => new Date(),       // default; inject only for deterministic tests
@@ -37,9 +40,9 @@ Returned shape, deeply frozen:
 }
 ```
 
-This shape can feed `projectWorkspace` after actual production token verification and database mapping are wired. It is a server-side authorization context, not a payload that clients are allowed to manufacture. Existing demo persona routes must remain segregated and must never be accepted by a production route.
+This shape feeds fictional contract tests today. The future SAML/session adapter can produce an equivalent server-side authorization context after its own validation and database checks; clients cannot manufacture it. Existing demo persona routes must remain segregated and must never be accepted by a production route.
 
-## Cryptographic verifier contract
+## Historical cryptographic verifier contract (not the selected login path)
 
 The resolver calls:
 
@@ -55,7 +58,7 @@ await verifyAccessToken(rawAccessToken, {
 });
 ```
 
-The production adapter must perform all of the following **before returning**:
+The original delegated-token design required all of the following **before returning**. These requirements document the legacy callback, not approval to build an alternate human-login path:
 
 1. Verify the signature with a maintained production token-validation library and trusted Entra discovery/JWKS configuration. Pin the intended issuer, supported algorithms and tenant. Do not handwrite JWT cryptography, accept `alg:none`, trust decoded claims, or follow key/discovery URLs from untrusted token fields.
 2. Verify the exact API audience, allowed tenant, issuer and valid lifetime. Wrong-resource Microsoft Graph tokens are not application API tokens. Support signing-key rotation through the verifier's reviewed key-management behavior; unknown or unverifiable keys fail closed.
@@ -66,7 +69,7 @@ The production adapter must perform all of the following **before returning**:
 { tokenUse: 'access_token', claims: verifiedClaims }
 ```
 
-`tokenUse` is an **adapter contract field**, not an assumed Microsoft claim. A fake `{tokenUse, claims}` wrapper or a decode-only callback does not satisfy this contract. This module cannot prove that an injected function performed cryptography; production composition, dependency review and real-token integration tests are required. There is intentionally no built-in placeholder verifier or permissive fallback.
+`tokenUse` is an **adapter contract field**, not an assumed Microsoft claim. A fake `{tokenUse, claims}` wrapper or a decode-only callback does not establish real authentication. This module cannot prove that an injected function performed cryptography; its test-only verifiers exercise the historical contract. The superseded design's proposed production verification work is not authorization to deploy a bearer fallback. There is intentionally no built-in placeholder verifier or permissive fallback.
 
 The resolver independently checks the returned envelope and required `tid`, `oid`, `iss`, `aud`, `exp`, `nbf`, `iat`, and `scp` fields before any database lookup. It accepts an exact audience string or a valid audience array containing that exact value. It requires the configured delegated scope, rejects `idtyp:app`, rejects expired/future lifetime claims, and rechecks expiration after asynchronous dependencies return. The default local clock tolerance is zero; operate with a synchronized server clock.
 
@@ -138,17 +141,18 @@ No principal or grant cache is present. Local grant revocation is observed on th
 | 401 | `INVALID_ACCESS_TOKEN` | Missing, unverifiable, wrong-purpose or invalid claims |
 | 403 | `PRINCIPAL_ACCESS_DENIED` | No active correctly bound identity or eligible scoped grants |
 | 503 | `AUTH_DEPENDENCY_UNAVAILABLE` | Database/clock dependency could not supply an authorization decision |
+| 503 | `LEGACY_BEARER_DISABLED` | Production use of this superseded prototype is prohibited |
 
-Verifier error details, token contents and database connection errors are never attached as public causes or logged by this module. The future HTTP boundary should extract exactly one Bearer credential, reject ambiguous duplicate credentials, use HTTPS, apply rate limiting, return generic errors, and avoid logging Authorization headers. Choose secure server sessions or a reviewed token flow; do not persist bearer credentials in ordinary browser-accessible application storage. No HTTP authentication route is implemented by these files.
+Verifier error details, token contents and database connection errors are never attached as public causes or logged by this module. No HTTP authentication route is implemented by these files. The future production HTTP boundary accepts only sessions established through the approved SAML/MFA flow; a supplied bearer token cannot authenticate a human application request. Provider/Graph credentials remain server-side and separate.
 
-## Easy Auth alternative
+## No platform-header or alternate-login fallback
 
-This module does not consume `x-ms-client-principal` or related headers. A future platform-authentication alternative must be independently reviewed: require the platform's authenticated routing guard; prevent direct origin bypass; ensure untrusted inbound identity headers are stripped/overwritten; validate issuer/audience/tenant settings; and bind the resulting identity to the same active database authorization model. A header's presence is not evidence of authentication. Do not fabricate a “verified access token” envelope from such headers to bypass this module's verifier contract. Use a separate explicitly trusted platform-auth adapter if that architecture is selected.
+This module does not consume `x-ms-client-principal` or related headers. Platform OIDC/Easy Auth is not the selected human-login path and must not be enabled as a SAML fallback. Strip untrusted identity headers, protect the direct origin and reject fabricated identity envelopes. A future reviewed SAML gateway would still need exact trust, MFA evidence, protected routing and independent application resource authorization; the mere presence of a proxy header proves none of those.
 
 ## Verification completed and remaining
 
 The boundary unit tests cover verifier rejection of tampered input, missing/wrong-purpose claims, external tenants, issuer/audience variants, lifetime failure, different Entra/internal IDs, disabled/revoked identities, role/scope injection, cross-principal grants, grant expiry/revocation, immutable output and database failure. Their verifier doubles are explicitly test-only. They do not prove real cryptographic verification.
 
-Before real users or customer records: implement and review the actual verifier and database loader; test signed valid/invalid tokens, wrong tenant/resource, ID-token substitution, app-only tokens, signing-key rotation and identity/grant revocation against an approved test environment; wire the protected route; confirm demo persona paths cannot reach production data; test every existing projection and mutation through the actual principal; and complete the hosting/session/security gates. Until then, production SSO remains incomplete.
+Six additional cross-module regression tests cover production rejection for the demo factory and this legacy resolver, including environment changes after construction and while provider/identity work is in flight. These do not verify SAML or deployed MFA. Before real users or customer records, implement and independently review the SAML SP, session store and current-grant loader; pass the complete [SAML/MFA and bypass matrix](Security-SAML-Access.md) in the actual approved environment. Production SSO remains incomplete.
 
 [1]: https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation "Microsoft: validate access-token claims"

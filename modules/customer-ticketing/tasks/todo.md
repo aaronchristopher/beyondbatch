@@ -14,11 +14,13 @@ Implementation: `src/persistence/postgres-request-store.mjs`, focused failure te
 - [ ] Verify: API integration tests, direct-ID denial and restart/reload of saved data.
 Dependencies: B1. Scope: M; likely workspace repository, API handler and integration tests.
 
-## B3 — Wire real Microsoft sign-in
-- [ ] Add a separate production entry point using supported Entra OIDC/session handling and the existing verified-principal contract.
-- [ ] Load current roles/customer grants from the database; reject other tenants, tampered/expired sessions and demo persona parameters.
-- [ ] Verify: two-account sign-in/sign-out, denied account and revoked-access checks in an approved test environment.
-Dependencies: B2 and approved app/redirect/runtime configuration. Scope: M; likely identity adapter, session handler, production entry point and auth tests.
+## B3 — Exclusive SAML 2.0 sign-in with mandatory MFA
+- [x] Block imported demo-server factories and the legacy bearer-token prototype in production; regression-test construction and later environment changes. These safeguards are not SAML authentication.
+- [ ] Implement a separate production entry point using a maintained SAML SP, exact UniWell trust configuration, signed request/response/assertion validation and shared replay protection. Exclude demo and legacy bearer entry points from its image.
+- [ ] Configure the separate human SAML enterprise app, assignment and app-scoped enforced MFA/authentication strength; verify signed MFA claims. No OIDC, password, magic-link, bearer-token or proxy-header human-login fallback.
+- [ ] Implement opaque server sessions, CSRF, logout/revocation, authentication-age and directory-eligibility bounds. Read current application grants for every protected resource; no client-selected identities.
+- [ ] Verify two real accounts, excluded users/admins, malformed/replayed SAML, revoked sessions, cross-customer access and direct API/attachment/default-origin bypass attempts. All private-data paths deny access if required identity or authorization checks fail.
+Dependencies: B2 and approved SAML app/ACS/certificate/Conditional Access/runtime configuration. Split implementation into SP validation, session/authorization integration and deployed acceptance work packages before coding. The full contract and acceptance matrix are in [Security SAML Access](../docs/Security-SAML-Access.md). No private email enters the application before this gate passes.
 
 ## B4 — Connect the existing workspace to saved records
 - [ ] Display one persisted sample request with history and owner using the signed-in user's permissions.
@@ -102,7 +104,7 @@ Dependencies: Q1 and release decision. Scope: M per focused infrastructure/deplo
 - [ ] Azure subscription/resource scope and deployment path confirmed
 - [ ] Entra app registrations and approved mailbox scope
 - [ ] Customer-to-PM and backup mapping
-- [ ] Entra authentication and server authorization integrated
+- [ ] Exclusive Entra SAML 2.0, enforced MFA and server authorization integrated and deployed bypass tests passed
 - [ ] PostgreSQL migrations executed and recovery validated
 - [ ] Durable jobs, polling and delta recovery in tenant; subscriptions when enabled
 - [ ] Provider/model processing authorization and evaluation
