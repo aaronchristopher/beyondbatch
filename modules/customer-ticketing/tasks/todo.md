@@ -15,12 +15,14 @@ Implementation: `src/persistence/postgres-request-store.mjs`, focused failure te
 Dependencies: B1. Scope: M; likely workspace repository, API handler and integration tests.
 
 ## B3 — Exclusive SAML 2.0 sign-in with mandatory MFA
+- [x] Implement strict Node-SAML validation, shared PostgreSQL replay/session/limiter storage, current identity/grant/eligibility resolution and HTTPS login/session/logout components. Verify genuine signed assertions and composed fictional HTTPS flows. No production listener or tenant changes. See [SAML Integration](../docs/SAML-Integration.md).
 - [x] Block imported demo-server factories and the legacy bearer-token prototype in production; regression-test construction and later environment changes. These safeguards are not SAML authentication.
-- [ ] Implement a separate production entry point using a maintained SAML SP, exact UniWell trust configuration, signed request/response/assertion validation and shared replay protection. Exclude demo and legacy bearer entry points from its image.
+- [ ] Compose the implemented SAML/session handler into a separate production entry point and authorized workspace using actual reviewed configuration. Exclude demo and legacy bearer entry points from its image.
 - [ ] Configure the separate human SAML enterprise app, assignment and app-scoped enforced MFA/authentication strength; verify signed MFA claims. No OIDC, password, magic-link, bearer-token or proxy-header human-login fallback.
-- [ ] Implement opaque server sessions, CSRF, logout/revocation, authentication-age and directory-eligibility bounds. Read current application grants for every protected resource; no client-selected identities.
+- [x] Implement opaque server sessions, CSRF, rotation/logout/revocation, authentication-age and directory-eligibility bounds; test in-flight expiry and revocation.
+- [ ] Supply the real directory eligibility provider, durable audit sink, narrow runtime roles, key retrieval, cleanup scheduler and trusted ingress configuration. Wire current grant/resource checks into every customer-data route.
 - [ ] Verify two real accounts, excluded users/admins, malformed/replayed SAML, revoked sessions, cross-customer access and direct API/attachment/default-origin bypass attempts. All private-data paths deny access if required identity or authorization checks fail.
-Dependencies: B2 and approved SAML app/ACS/certificate/Conditional Access/runtime configuration. Split implementation into SP validation, session/authorization integration and deployed acceptance work packages before coding. The full contract and acceptance matrix are in [Security SAML Access](../docs/Security-SAML-Access.md). No private email enters the application before this gate passes.
+Production dependencies: B2 and approved SAML app/ACS/certificate/Conditional Access/runtime configuration. Protocol/session components are implemented independently of B2; production composition and deployed acceptance remain open. The full contract and acceptance matrix are in [Security SAML Access](../docs/Security-SAML-Access.md). No private email enters the application before this gate passes.
 
 ## B4 — Connect the existing workspace to saved records
 - [ ] Display one persisted sample request with history and owner using the signed-in user's permissions.

@@ -6,7 +6,7 @@ The goal is a meaningful customer response within **24 elapsed hours**, with one
 
 **Current state: tested development code using fictional data.** Live Microsoft mail, complete production sign-in, production PostgreSQL wiring and native Classic Outlook launch are not connected. Production startup is deliberately blocked. See [implementation status](docs/Implementation-Status.md) and [release gates](docs/Production-Readiness.md).
 
-**Required live access: exclusive UniWell Entra SAML 2.0 with enforced MFA.** Every private-data route must also enforce current resource permissions. Demo factories and the legacy bearer prototype reject production use; these safeguards do not implement SAML. See [security and acceptance contract](docs/Security-SAML-Access.md).
+**Required live access: exclusive UniWell Entra SAML 2.0 with enforced MFA.** The SAML protocol/session/backend components are now implemented and tested with genuine signed fictional assertions and local HTTPS. They are not deployed or attached to the customer workspace. Every private-data route still needs current resource permissions. Demo factories and the legacy bearer prototype remain prohibited in production. See [SAML integration](docs/SAML-Integration.md) and [security acceptance](docs/Security-SAML-Access.md).
 
 ## Run from the repository root
 
@@ -32,7 +32,7 @@ Run either demo server, not both for the same exercise. The ordinary demo prints
 |---|---|
 | `src/domain/` | Immutable request events, response obligations, closure and reopening |
 | `src/integrations/` | Scoped read-only Graph adapter, extraction contracts, correlation proposals |
-| `src/security/` | Scoped views, source-link validation and a legacy development-only principal prototype; production SAML is pending |
+| `src/security/` | SAML protocol/session/HTTPS boundaries, current authorization, scoped views and source links; production composition remains pending |
 | `src/persistence/` | Normalized PostgreSQL request store, checkpoint adapter and fictional SQLite stores |
 | `src/fixtures/` | Durable fictional pipeline and local HTTP demonstrations |
 | `public/` | Personal, department and president browser workspace with internal windows |
