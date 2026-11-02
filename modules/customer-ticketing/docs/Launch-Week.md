@@ -1,5 +1,7 @@
 # Controlled launch week — November 2–6, 2026
 
+**Scope update, November 2:** [All-PM rollout](All-PM-Rollout.md) is the current scope decision. The first operational rollout must cover the complete approved PM mailbox roster through one shared ingestion service. A one-mailbox smoke test is only a technical check. The dated schedule and effort/cost allowances below were written for a smaller proposed wave and are historical planning assumptions, not a current commitment or an all-PM estimate. Replan against the resolved roster and release gates before promising a date.
+
 **Target:** a controlled, authenticated, read-only Microsoft 365 pilot by **Friday, November 6, 2026**, if the gates below pass. This is a target, not a deployment commitment. The current repository is a local development scaffold with fictional data; it is not connected production software. No credentials, tenant grants, mailbox settings or outbound delivery permissions have been changed by this build.
 
 The product is designed for organization-wide operational coverage through explicitly approved mailbox waves. Friday's target is the first useful wave, not a claim that every company mailbox is covered. No release may be described as “companywide” while relevant mailboxes, sent-message paths or folders remain outside verified coverage.
@@ -8,7 +10,7 @@ This response-first slice uses the newly specified 24-hour elapsed response poli
 
 ## What must work on Friday
 
-Two approved PM primary mailboxes and one approved shared customer-facing mailbox, covering three to five mapped customer accounts, are the proposed first wave. The exact people, mailboxes and customers require business and administrator approval. Include incoming and sent mail, approved business folders and supported attachments. Unsupported or sensitive content enters a restricted review queue; it is never silently interpreted as having no work.
+The current first-rollout scope is all PM primary mailboxes, plus explicitly included shared customer-facing mailboxes. The product owner has authorized the all-PM scope; the complete current roster and customer-to-PM mappings still need to be supplied and verified. Include incoming and sent mail, approved business folders and supported attachments. Unsupported or sensitive content enters a restricted review queue; it is never silently interpreted as having no work. A rollout missing a PM mailbox must identify the gap and cannot be described as complete all-PM coverage.
 
 PMs use ordinary email. They do not add ticket IDs to subjects or administer every message. The app correlates eligible requests across threads and mailbox copies, proposes evidence-backed obligations and maintains per-user work views. A named review steward checks uncertain classification, correlation and ownership. Only validated routine rules may operate automatically. Closure requires verified evidence and human confirmation throughout this pilot.
 
@@ -36,7 +38,7 @@ Work that depends on grants cannot be compressed by allowing broader permissions
 
 | Decision | Proposed default | Required approver |
 |---|---|---|
-| First-wave scope and PM mapping | Two PM mailboxes + one shared mailbox; three to five customers; 30-day relevant-content lookback | Business sponsor / PM lead, mailbox business owners, Exchange administrator |
+| Exact all-PM roster and mapping | All PM primary mailboxes; explicitly listed shared mailboxes; current customer/primary/backup assignments; content lookback still to confirm | PM lead provides roster and mapping; Exchange administrator resolves exact scope |
 | 24-hour duty coverage | Named primary and backup available each day, including Nov 7–8; app checked at an agreed cadence | PM lead + participating department leads |
 | Effective Graph access | Separate ingestion principal; scoped Exchange Application RBAC `Application Mail.Read`; no redundant tenant-wide mail grant; no writes/sends | Authorized Exchange/Entra administrator and security owner |
 | Customer/president visibility | Sanitized customer-obligation projection; evidence permission checked separately | Business sponsor + security/privacy owner |
