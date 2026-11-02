@@ -20,6 +20,7 @@ export function projectWorkspace({ principal, requests, now, coverage }) {
     const clock = deriveClock(request.clock, instant);
     return {
       id: request.id, customer: request.customer, subject: request.subject,
+      ...(typeof request.emailSubject === 'string' ? { emailSubject: request.emailSubject } : {}),
       owner: request.owner || 'Assignment needs review', department: request.department || 'Triage',
       receivedAt: request.clock.receivedAt, dueAt: clock.dueAt,
       lastMeaningfulResponseAt: request.clock.lastMeaningfulResponseAt,

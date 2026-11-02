@@ -12,3 +12,132 @@
 @media(max-width:700px){.topbar .preview-label{order:3;flex-basis:100%;max-width:none;text-align:left;margin:0}.topbar .persona-control{order:2}.persona-label{font-size:11px}.persona-button{font-size:12px;padding-left:10px;padding-right:10px}}
 .outlook-actions-group{width:100%;flex-wrap:wrap;justify-content:flex-end}.outlook-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;min-height:44px}.outlook-link:focus-visible{outline:2px solid var(--accent);outline-offset:4px}.outlook-action-note{flex-basis:100%;margin:0;font-size:12px;line-height:1.6;color:var(--muted)}.outlook-platform-note{margin:18px 0 0;font-size:12px;line-height:1.6;color:var(--muted)}
 @media(max-width:700px){.outlook-actions-group{justify-content:flex-start;gap:8px}.outlook-actions-group .primary-button{margin-left:auto}.outlook-action-note{font-size:12px}}
+
+/* Request-level report: the actual ask is visible before opening a window. */
+.request-table-scroll{overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--control) transparent}
+.request-report{min-width:1080px}
+.request-report th:first-child{width:17%}
+.request-report th:nth-child(2){width:30%}
+.request-report th:nth-child(3){width:16%}
+.request-report th:nth-child(4){width:25%}
+.request-report th:last-child{width:12%}
+.request-report td{padding-top:17px;padding-bottom:14px;overflow-wrap:anywhere}
+.request-report .customer-name-button{font-size:14px;line-height:1.4}
+.request-report .customer-meta{font-size:11px;line-height:1.6}
+.request-task-button{display:block;width:100%;min-height:44px;padding:0;border:0;background:none;text-align:left;font-size:14px;font-weight:600;line-height:1.5;color:var(--text)}
+.request-task-button:hover,.request-task-button[aria-expanded="true"]{color:var(--accent)}
+.request-email-subject{display:block;color:var(--muted);font-size:12px;line-height:1.5;margin:2px 0;overflow-wrap:anywhere}
+.email-trail-link{display:inline-flex;align-items:center;min-height:44px;padding:3px 0;border:0;background:none;color:var(--info);font-size:12px;font-weight:500;text-align:left;text-decoration:underline;text-decoration-color:transparent;text-underline-offset:4px}
+.email-trail-link:hover{text-decoration-color:currentColor;color:var(--text)}
+.request-pm-cell{font-weight:500;line-height:1.6}
+.request-source-subject{font-size:12px;line-height:1.6;color:var(--muted);margin:-8px 0 18px;overflow-wrap:anywhere}
+.window-actions-group{flex-wrap:wrap}
+
+/* Source messages live in their own movable window, alongside the request. */
+.email-trail-window{width:740px;height:min(660px,calc(100% - 24px))}
+.email-trail-window .window-body{padding:22px 24px}
+.fictional-email-banner{padding:10px 12px;margin:0 0 20px;border:1px solid #3e5163;border-radius:6px;background:#182632;color:var(--muted);font-size:12px;line-height:1.6}
+.fictional-email-banner strong{color:var(--text);font-weight:600}
+.email-trail-window .trail-task-title{font-size:22px;line-height:1.35}
+.email-trail-window .window-context{margin-bottom:12px}
+.trail-reading-note{font-size:12px;line-height:1.6;color:var(--muted);margin:0 0 22px}
+.email-thread{margin-top:28px}
+.email-thread-heading{padding-bottom:12px;border-bottom:1px solid var(--control);margin-bottom:12px}
+.email-thread-index{font-size:11px;color:var(--info);font-weight:600}
+.email-thread-heading h3{margin:4px 0 0;font-size:15px;font-weight:600;line-height:1.5;overflow-wrap:anywhere}
+.email-message{padding:17px 18px;margin-top:10px;border:1px solid var(--border);border-radius:8px;background:#101923}
+.email-message-internal{border-left:3px solid #7a729a;padding-left:16px}
+.email-message-header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.email-message-sender{min-width:0;display:flex;flex-direction:column;gap:2px}
+.email-message-sender strong{font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.email-message-sender span{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.email-message-meta{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
+.email-message-meta time{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.email-direction{font-size:10px;font-weight:600;color:var(--muted);border:1px solid var(--border);padding:2px 6px;border-radius:4px;white-space:nowrap}
+.email-direction-incoming{color:var(--info)}
+.email-direction-outgoing{color:var(--success)}
+.email-direction-internal{color:#c6bbdf}
+.email-recipients{font-size:11px;line-height:1.6;color:var(--muted);overflow-wrap:anywhere;margin:10px 0 0;padding-top:9px;border-top:1px solid var(--border)}
+.email-message-body{font-size:13px;line-height:1.75;color:var(--text);white-space:pre-wrap;overflow-wrap:anywhere;margin:16px 0 0}
+.email-attachments{list-style:none;display:flex;flex-wrap:wrap;gap:7px;padding:0;margin:16px 0 0}
+.email-attachments li{font-size:11px;line-height:1.5;padding:6px 8px;border:1px solid var(--border);border-radius:5px;color:var(--muted);overflow-wrap:anywhere}
+.trail-footer-note{font-size:11px;line-height:1.6;color:var(--muted);margin:0}
+.trail-loading,.trail-empty{padding:22px 0;font-size:13px;color:var(--muted)}
+.trail-empty .secondary-button{margin-top:12px}
+@media(max-width:700px){
+  .request-report{display:table;min-width:1080px}
+  .request-report thead{display:table-header-group}
+  .request-report tbody{display:table-row-group}
+  .request-report tr{display:table-row;position:static;padding:0;margin:0;border:0}
+  .request-report td,.request-report td:nth-child(2),.request-report td:nth-child(5){display:table-cell;position:static;padding:14px 10px;border-bottom:1px solid var(--border)}
+  .request-report td:first-child{padding-left:3px;padding-right:10px}
+  .request-report td:nth-child(2)::after,.request-report td:nth-child(3)::before,.request-report td:nth-child(4)::before{content:none;display:none}
+  .request-report th{padding:3px 10px 14px}
+  .request-report th:first-child{width:17%;padding-left:3px}
+  .request-report th:nth-child(2){width:30%}
+  .request-report th:nth-child(3){width:16%}
+  .request-report th:nth-child(4){width:25%}
+  .request-report th:last-child{width:12%}
+  .request-table-scroll{margin-right:-15px;padding-right:15px}
+  .email-trail-window{width:100%;height:100%;max-width:none}
+  .email-trail-window .window-body{padding:20px 16px}
+  .email-message{padding:14px}
+  .email-message-internal{padding-left:12px}
+  .email-message-header{flex-direction:column;gap:10px}
+  .email-message-meta{width:100%;flex-direction:row;justify-content:space-between;align-items:center;gap:6px}
+  .email-message-body{font-size:13px}
+  .email-trail-window .trail-task-title{font-size:21px}
+  .trail-footer-note{max-width:52%}
+}
+
+/* The primary response stays in Beyond Batch; the demo never sends mail. */
+.app-window{max-height:calc(100dvh - 32px)}
+.thread-reply-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.thread-reply-note{font-size:11px;line-height:1.6;color:var(--muted);margin:0;flex-basis:100%}
+.email-thread>.thread-reply-note{margin:0 0 14px}
+.reply-composer-window{width:1000px;height:min(760px,calc(100% - 24px))}
+.reply-composer-window .window-body{padding:20px 24px}
+.reply-composer-window .fictional-email-banner{margin-bottom:17px}
+.reply-composer-window .window-context{margin-bottom:18px}
+.composer-permission-note{font-size:12px;line-height:1.6;color:var(--warning);margin:0 0 18px}
+.composer-layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:24px;align-items:start}
+.composer-form{min-width:0}
+.composer-mode{display:flex;gap:7px;margin-bottom:17px}
+.composer-mode .is-active{border-color:var(--accent);background:#2d2330;color:var(--text)}
+.composer-field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.composer-field label{font-size:12px;color:var(--muted)}
+.composer-field input{width:100%;min-height:42px;padding:9px 10px;border:1px solid var(--control);border-radius:6px;background:#101923;color:var(--text);font-size:12px;line-height:1.5}
+.composer-field input[readonly]{border-color:var(--border);background:#17212b;color:var(--muted)}
+.composer-field-note{font-size:11px;color:var(--muted);line-height:1.7;margin:5px 0 12px}
+.composer-textarea{min-height:210px;resize:vertical}
+.composer-attachment-controls{display:flex;margin-top:13px}
+.attachment-picker{cursor:pointer;display:inline-flex;align-items:center}
+.composer-attachment-controls input:focus-visible+.attachment-picker{outline:2px solid var(--accent);outline-offset:4px}
+.composer-attachment-list{list-style:none;margin:10px 0 0;padding:0}
+.composer-attachment-list li{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}
+.composer-attachment-list li span{overflow-wrap:anywhere;min-width:0}
+.composer-attachment-list .text-button{padding-left:8px;padding-right:8px;flex-shrink:0}
+.composer-draft-status{font-size:11px;line-height:1.7;color:var(--success);margin:12px 0 0}
+.composer-source{min-width:0;border-left:1px solid var(--border);padding-left:23px}
+.composer-source>.section-title{margin-top:0}
+.composer-source-subject{font-size:13px;line-height:1.6;font-weight:500;overflow-wrap:anywhere;margin:8px 0 12px}
+.composer-source .email-message{margin-top:0;padding:14px}
+.composer-source .email-message-header{flex-direction:column;gap:9px}
+.composer-source .email-message-meta{align-items:flex-start}
+.composer-source .email-message-body{font-size:12px;max-height:350px;overflow:auto;padding-right:5px}
+.composer-source>.secondary-button{margin-top:4px}
+.composer-actions{width:100%;justify-content:flex-end}
+.composer-send-note{flex-basis:100%;font-size:12px;line-height:1.6;margin:0;color:var(--muted)}
+.composer-actions .primary-button{min-width:78px}
+@media(max-width:1100px) and (min-width:701px){.reply-composer-window{width:calc(100% - 24px)}.composer-layout{gap:18px}.composer-source{padding-left:17px}}
+@media(max-width:700px){
+  .app-window{max-height:none}
+  .reply-composer-window{width:100%;height:100%;max-width:none}
+  .reply-composer-window .window-body{padding:20px 16px}
+  .composer-layout{grid-template-columns:minmax(0,1fr);gap:28px}
+  .composer-source{padding:20px 0 0;border-left:0;border-top:1px solid var(--border)}
+  .composer-source .email-message-meta{flex-direction:row;width:100%;align-items:center}
+  .composer-source .email-message-body{max-height:280px}
+  .composer-actions{justify-content:flex-start}
+  .composer-actions .primary-button{margin-left:auto}
+}

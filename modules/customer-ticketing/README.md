@@ -45,7 +45,7 @@ Run either demo server, not both for the same exercise. The ordinary demo prints
 - Authorized-mailbox Graph reads, metadata delta, immutable IDs, safe cursors, retry handling and checkpoint callbacks. Token acquisition and production callbacks remain to be wired.
 - Provider-neutral extraction validation and conservative cross-thread/cross-mailbox proposals. Uncertainty stays reviewable; model output cannot send or close requests.
 - Durable fictional ingestion, reviewed request creation and Sent-evidence processing across local SQLite restarts. SQLite is a test/demo harness, not the production database.
-- Request, history and draft-preview windows. Reply in Outlook supports a verified original-message web link when server-loaded source permissions are available. Current fixtures show the disconnected state. Desktop Classic Outlook requires an additional integration; no native launch is claimed.
+- A request-level president table with the task and original email subject, plus separate request, history, email-trail and reply-composer windows. The trail and composer use explicitly fictional messages. Draft text remains in session memory; no mail is sent or attachment content uploaded. Open in Outlook supports a verified original-message web link when server-loaded source permissions are available. Current fixtures show the disconnected state. Desktop Classic Outlook requires an additional integration; no native launch is claimed. See [reply flow](docs/Outlook-Reply-Flow.md).
 
 ## Integration with BeyondBatch
 

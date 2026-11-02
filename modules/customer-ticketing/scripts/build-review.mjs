@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { makeFixtures, demoPrincipals } from '../src/fixtures.mjs';
 import { projectWorkspace } from '../src/security/workspace.mjs';
+import { getDemoEmailTrail } from '../src/fixtures/email-trails.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dist = resolve(root, 'dist/review');
@@ -28,14 +29,14 @@ const helpFunction = `function openHowItWorks() {
     ['Each request becomes clear work', 'Separate asks get separate requests. Related emails stay linked to the same issue.'],
     ['One PM owns the answer', 'The PM remains accountable while QA, R&D or another department supplies the needed input.'],
     ['The 24-hour clock stays visible', 'A meaningful response is due within 24 elapsed hours, including weekends. Acknowledgments and internal activity do not satisfy it.'],
-    ['Reply from the original email', 'Reply in Outlook opens the linked customer message once connected. You reply normally; the clock keeps running until a meaningful sent reply is verified. Classic Outlook desktop opening requires its Windows integration.'],
+    ['Read and reply in the workspace', 'Open the email trail, then compose a reply inside Beyond Batch. This demo keeps drafts in session memory and cannot send. Open in Outlook remains a separate option once connected. The clock keeps running until a meaningful sent reply is verified.'],
     ['Completion is verified', 'A reply alone does not close the request. The required outcome and supporting evidence must be confirmed.']
   ];
   const list = el('ol', 'how-steps');
   for (const [title, description] of steps) {
     const item = el('li'); item.append(el('h3', '', title), el('p', '', description)); list.append(item);
   }
-  window.body.append(list, el('p', 'history-note', 'Open a request to try Reply in Outlook or Preview update, then switch to the President demo. Outlook is not connected in this review; nothing is sent.'));
+  window.body.append(list, el('p', 'history-note', 'Open a request, read its sample email trail and try composing a reply. Then switch to the President demo to review every open ask. Microsoft email is not connected; nothing is sent.'));
   window.actions.append(el('p', 'desktop-hint', 'Sample data only · Microsoft email not connected'), button('Back to the workspace', 'secondary-button', () => closeWindow('help:workflow')));
 }
 
@@ -83,6 +84,10 @@ const reviewCss = `
     'fetch(new URL(`./fixtures/${persona}.json`, import.meta.url), { headers: { Accept: \'application/json\' }, cache: \'no-store\' })',
     'static fixture fetch');
   app = replaceOnce(app,
+    'fetch(`/api/email-trail?persona=${encodeURIComponent(persona)}&requestId=${encodeURIComponent(requestId)}`, { headers: { Accept: \'application/json\' }, cache: \'no-store\' })',
+    'fetch(new URL(`./fixtures/${persona}-email-trails.json`, import.meta.url), { headers: { Accept: \'application/json\' }, cache: \'no-store\' }).then(async response => { if (!response.ok) return response; const trails = await response.json(); if (!trails || typeof trails !== \'object\' || Array.isArray(trails)) throw new Error(\'Invalid sample email trails\'); const trail = Object.hasOwn(trails, requestId) ? trails[requestId] : null; return new Response(JSON.stringify(trail), { status: trail ? 200 : 404, headers: { \'Content-Type\': \'application/json\' } }); })',
+    'static email trail fetch');
+  app = replaceOnce(app,
     "if (!data || !Array.isArray(data.requests) || !data.coverage || !data.persona) throw new Error('The workspace response is incomplete.');",
     "if (!data || !Array.isArray(data.requests) || data.coverage?.mode !== 'fictional' || !data.persona || data.persona.role !== persona) throw new Error('This review requires fictional data for the selected sample view.');",
     'sample-only response guard');
@@ -101,9 +106,7 @@ const reviewCss = `
   app = app
     .replaceAll('Loading fictional workspace…', 'Loading sample workspace…')
     .replaceAll('No open requests are included in this fictional workspace.', 'No open requests are included in this sample view.')
-    .replaceAll('Customer status and dependencies only. Private email bodies are not included in this president view.', 'Sample customer status and dependencies only. This President demo contains no email bodies.')
     .replaceAll('This local preview shows fixture timing and permitted summaries. It does not open or fetch real email.', 'This review shows sample timing and request summaries. It does not open or fetch real email.')
-    .replaceAll('This view shows the customer commitment and dependency. Private source email is not available here.', 'This sample view shows customer commitments and dependencies, without email bodies.')
     .replaceAll('Local text only · not saved to Outlook', 'Review text only · not saved to Outlook');
   app = replaceOnce(app,
     "$('#search').addEventListener('input',",
@@ -119,7 +122,7 @@ const reviewCss = `
 
 const app = await readFile(resolve(dist, 'app.js'), 'utf8');
 const html = await readFile(resolve(dist, 'index.html'), 'utf8');
-if (/\/api\/workspace/.test(app) || /innerHTML|outerHTML|insertAdjacentHTML/.test(app)) throw new Error('Unexpected API or raw-HTML sink in the static review.');
+if (/\/api\//.test(app) || /innerHTML|outerHTML|insertAdjacentHTML/.test(app)) throw new Error('Unexpected API or raw-HTML sink in the static review.');
 if (/(?:src|href)=["']https?:/i.test(html)) throw new Error('The static review must not depend on external assets.');
 if (!html.includes('Microsoft email not connected') || !html.includes('Team review • sample data')) throw new Error('Required review labels are missing.');
 const syntax = spawnSync(process.execPath, ['--check', resolve(dist, 'app.js')], { encoding: 'utf8' });
@@ -138,6 +141,16 @@ for (const persona of personas) {
   if (data.requests.some(row => ['rawEmail', 'rawBody', 'mailBody', 'attachments'].some(field => Object.hasOwn(row, field)))) throw new Error(`Raw source content is not permitted in the ${persona} review fixture.`);
   if (data.requests.some(row => row.outlookAction?.status !== 'not_connected' || Object.hasOwn(row.outlookAction, 'href'))) throw new Error(`Connected Outlook actions are not permitted in the ${persona} sample view.`);
   await writeFile(resolve(dist, 'fixtures', `${persona}.json`), `${JSON.stringify(data, null, 2)}\n`);
+  // Static artifacts contain fictional email examples only. This is a sample
+  // view, not production source-mail authorization; the workspace stays lean.
+  const trails = {};
+  for (const row of data.requests) {
+    const request = requests.find(item => item.id === row.id);
+    const trail = getDemoEmailTrail({request,principal:demoPrincipals[persona]});
+    if (!trail || trail.mode !== 'fictional' || trail.requestId !== row.id) throw new Error(`Missing ${persona} sample email trail.`);
+    trails[row.id] = trail;
+  }
+  await writeFile(resolve(dist, 'fixtures', `${persona}-email-trails.json`), `${JSON.stringify(trails, null, 2)}\n`);
   process.stdout.write(`Generated ${persona} sample view: ${data.requests.length} requests.\n`);
 }
 process.stdout.write(`All three sample views use the fixed clock ${sampleTime}.\n`);

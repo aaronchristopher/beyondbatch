@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { makeFixtures, demoPrincipals } from './fixtures.mjs';
 import { projectWorkspace } from './security/workspace.mjs';
+import { getDemoEmailTrail } from './fixtures/email-trails.mjs';
 
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 const assets = { '/':['index.html','text/html; charset=utf-8'], '/app.js':['app.js','text/javascript; charset=utf-8'], '/styles.css':['styles.css','text/css; charset=utf-8'] };
@@ -29,6 +30,19 @@ export function createDemoServer({requests=makeFixtures(), clock=()=>new Date(),
     try {
       const url = new URL(req.url,'http://localhost');
       if (url.pathname === '/health') return respond(200,{mode:'development-demo',microsoftConnected:false,productionReady:false,durableFixture:workspaceProvider !== null});
+      if (url.pathname === '/api/email-trail') {
+        const allowedKeys = new Set(['persona', 'requestId']);
+        if ([...url.searchParams.keys()].some(key => !allowedKeys.has(key) || url.searchParams.getAll(key).length !== 1)) return respond(400,{error:'Invalid demo email-trail query'});
+        const personaKey=url.searchParams.get('persona');
+        const principal=Object.hasOwn(demoPrincipals,personaKey) ? demoPrincipals[personaKey] : null;
+        if (!principal) return respond(400,{error:'Unknown demo persona'});
+        // The persisted fixture workspace has different evidence identities. Never
+        // substitute these static conversations for evidence from that provider.
+        if (workspaceProvider) return respond(404,{error:'Sample email trail unavailable'});
+        const request=requests.find(item=>item.id===url.searchParams.get('requestId'));
+        const trail=getDemoEmailTrail({request,principal});
+        return trail ? respond(200,trail) : respond(404,{error:'Sample email trail unavailable'});
+      }
       if (url.pathname === '/api/workspace') {
         const personaKey=url.searchParams.get('persona') || 'pm';
         const principal=Object.hasOwn(demoPrincipals,personaKey) ? demoPrincipals[personaKey] : null;

@@ -1,4 +1,5 @@
 import { createRequest } from './domain/response-clock.mjs';
+import { demoEmailSubject } from './fixtures/email-trails.mjs';
 
 export const demoPrincipals = Object.freeze({
   pm: { id:'avery', name:'Avery · example PM', role:'pm', tenantId:'demo-uniwell', customerIds:['cedar','harbor','meadow','summit'], departmentIds:[] },
@@ -20,6 +21,7 @@ export function makeFixtures(now = new Date()) {
     const receivedAt = new Date(+new Date(now) - age*3_600_000).toISOString();
     return {
       id,tenantId:'demo-uniwell',classification:'customer_operations',customerId,customer,subject,ownerId,owner,departmentId,department,nextAction,
+      emailSubject:demoEmailSubject(id),fixtureSource:'fictional-email-trail-v1',
       clock:createRequest({id,customerId,subject,ownerId,receivedAt,evidenceId:`fixture-${id}`}),
       operationalEvidenceSummary:'Illustrative incoming request. No verified customer response is recorded. No Microsoft mailbox is connected.',
       rawEmail:'Fixture content must never appear in summary responses.',
