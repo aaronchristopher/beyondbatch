@@ -4,7 +4,7 @@ Updated November 2, 2026. This extends the same project plan. All code remains i
 
 ## Verified starting point
 
-The private fictional interface has task/email-subject columns, linked email-trail windows, session-only reply drafts and a secondary Open in Outlook action. Source is merged through PR 3. The domain/access/adapter foundations have 209 passing tests. The database schema exists, but a production PostgreSQL database is not connected. Production sign-in, real mail, model inference and sending are not connected. Automated tests do not establish real-mail accuracy. Visual interaction acceptance remains open because the managed browser preview route was unavailable.
+The private fictional interface has task/email-subject columns, linked email-trail windows, session-only reply drafts and a secondary Open in Outlook action. Source is merged through PR 3. The domain/access/adapter foundations have 217 passing tests. The normalized PostgreSQL request store also passed 20 native PostgreSQL integration scenarios; a production database is not connected. Production sign-in, real mail, model inference and sending are not connected. Automated tests do not establish real-mail accuracy. Visual interaction acceptance remains open because the managed browser preview route was unavailable.
 
 The dedicated Microsoft reader app has already been registered, and the user supplied the initial mailbox roster including a corrected entry. Do not ask for these again or create a duplicate reader registration. Exchange mailbox resolution, scoped grants, the shared project-management address's actual type and customer-to-PM/backup mappings still need verification. The first operational scope is all named approved mailboxes; two unnamed possible additions remain excluded. A one-mailbox smoke test does not narrow that scope.
 
@@ -34,7 +34,7 @@ The milestone sequence is a dependency order, not a promise that every stage can
 
 ## Implementation task index
 
-Detailed acceptance criteria, dependencies and file boundaries are in `todo.md`. The next task is **B1: persist one request in PostgreSQL**; it can be implemented and locally integration-tested without granting Microsoft access or connecting a model key. B2–B4 complete the signed-in saved-workspace milestone.
+Detailed acceptance criteria, dependencies and file boundaries are in `todo.md`. **B1: persist one request in PostgreSQL** is complete in a disposable PostgreSQL service, including actual server-restart persistence and native concurrency/permission checks. **B2: read saved work through authorized API projections** follows. B2–B4 complete the signed-in saved-workspace milestone without live mailbox ingestion or model keys.
 
 ## Inputs and approvals at the point they are needed
 

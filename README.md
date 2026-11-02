@@ -25,9 +25,10 @@ The [Customer Ticketing module](modules/customer-ticketing/README.md) turns cust
 
 All implementation for this module belongs in `modules/customer-ticketing/` in this repository. It is part of BeyondBatch, not a separate product or source repository. Existing manufacturing planning documents remain in `docs/`.
 
-Requires Node.js 24 or later. The current foundation has no external runtime dependencies or required npm installation:
+Requires Node.js 24 or later. Install the pinned workspace dependencies, including the PostgreSQL driver:
 
 ```sh
+npm ci --ignore-scripts
 npm test
 npm run check
 npm run demo:ticketing
