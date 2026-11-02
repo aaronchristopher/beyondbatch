@@ -1,0 +1,16 @@
+{
+  "name": "beyondbatch",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.0.0" },
+  "workspaces": ["modules/customer-ticketing"],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "check": "npm run check --workspaces --if-present",
+    "demo:ticketing": "npm run demo --workspace @beyondbatch/customer-ticketing",
+    "demo:ticketing:durable": "npm run demo:durable --workspace @beyondbatch/customer-ticketing",
+    "fixture:ticketing": "npm run fixture:e2e --workspace @beyondbatch/customer-ticketing",
+    "build:ticketing-review": "npm run build:review --workspace @beyondbatch/customer-ticketing"
+  }
+}

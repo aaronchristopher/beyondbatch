@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0c1219">
+    <title>Beyond Batch · Requests</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to workspace</a>
+    <header class="topbar">
+      <div class="identity">
+        <svg class="brand-symbol" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 7h12a7 7 0 0 1 0 14H5V7Zm7 4h9a7 7 0 0 1 0 14h-9V11Z"/></svg>
+        <span class="brand-name">beyond batch</span><span class="brand-divider" aria-hidden="true"></span><span class="company">UniWell</span>
+      </div>
+      <div class="topbar-end">
+        <span class="preview-label">Development preview <span aria-hidden="true">·</span> fictional data</span>
+        <div class="persona-control" role="group" aria-label="Demo persona; this does not change real access">
+          <span class="persona-label">Demo view</span>
+          <button class="persona-button is-active" type="button" data-persona="pm" aria-pressed="true">My work</button>
+          <button class="persona-button" type="button" data-persona="department" aria-pressed="false">QA queue</button>
+          <button class="persona-button" type="button" data-persona="president" aria-pressed="false">President</button>
+        </div>
+      </div>
+    </header>
+    <main id="main" tabindex="-1">
+      <div class="page-heading">
+        <div><h1 id="page-title">Your response clock</h1><p id="page-description">A meaningful answer within 24 hours. A clear next step until it’s resolved.</p></div>
+        <div class="clock-note"><span class="clock-dot" aria-hidden="true"></span><div><strong>24 elapsed hours</strong><span>Weekends count, too</span></div></div>
+      </div>
+      <section class="summary-strip" aria-label="Response overview" id="summary-strip"></section>
+      <div class="workspace-toolbar">
+        <div class="workspace-title"><span class="workspace-dot" aria-hidden="true"></span><h2 id="workspace-title">Response workspace</h2></div>
+        <div class="workspace-tools">
+          <label class="search-control"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><span class="sr-only">Search visible requests</span><input id="search" type="search" placeholder="Customer or request" autocomplete="off"></label>
+          <label class="department-control"><span class="sr-only">Filter by department</span><select id="department-filter"><option value="">All departments</option></select></label>
+          <button class="icon-button" id="refresh-button" type="button" aria-label="Reload fictional workspace" title="Reload fictional workspace"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.7-2L20 8M4 16l2.2 3A7 7 0 0 0 17.9 17"/></svg></button>
+        </div>
+      </div>
+      <section class="workspace-canvas" id="workspace-canvas" aria-label="Request workspace">
+        <div id="workspace-content" class="workspace-content" aria-live="polite"></div>
+        <div id="window-layer" class="window-layer"></div>
+      </section>
+      <div class="window-dock" id="window-dock" aria-label="Open workspace windows"><span class="dock-caption">Your workspace</span><span class="dock-empty" id="dock-empty">Open a request to see what moves it forward.</span><div class="dock-items" id="dock-items"></div><button type="button" class="text-button dock-reset" id="reset-windows" hidden>Arrange windows</button></div>
+      <footer class="workspace-footer"><span id="coverage-text">Loading fictional workspace…</span><span id="as-of"></span></footer>
+    </main>
+    <div class="sr-only" id="announcer" aria-live="polite" aria-atomic="true"></div>
+  </body>
+</html>
