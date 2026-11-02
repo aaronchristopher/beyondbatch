@@ -4,7 +4,7 @@ Canonical source: `modules/customer-ticketing/` in `aaronchristopher/beyondbatch
 
 ## Verified development behavior
 
-The repository-root test run passed **223 tests**, including six production-guard regression tests, exact response-provenance and transaction-failure checks, six scoped fictional email-trail checks and clean-checkout/reproducible-build checks. Coverage includes 24-hour response obligations, partial Sent coverage, conservative correlation, request/source authorization, Graph read boundaries, transactions, durable fictional jobs, identity/checkpoint contracts and local HTTP routes. These are software tests with mocked services or fictional local databases, not a real-mail evaluation sample. Source syntax checks and the static review build also passed from the repository root.
+The repository-root test run passed **323 tests**, including genuine signed SAML, composed HTTPS login/session/logout, authorization/eligibility, six production guards, request workflow and clean-checkout/reproducible-build checks. Source checks passed for 60 JavaScript files and the static review build passed after a clean scripts-disabled install. These are software tests using fictional identities and local or mocked services, not actual tenant sign-in or real-mail evaluation.
 
 The president table shows one row per request with its task and original email subject. Separate movable windows show fictional email threads and a reply composer; email bodies remain outside summary projections. In-app Reply is the primary planned workflow, with Open in Outlook as a secondary action. Drafts and attachment name/size previews stay in session memory, sending remains disabled, and no Microsoft message links are invented. Opening or drafting does not reset a response clock or close a request. Automated checks and a source review passed; browser interaction QA for this UI revision remains unverified because the managed preview browser route refused its connection.
 
@@ -22,11 +22,21 @@ The store is an internal trusted-server component. The website still uses fictio
 
 Human production access now requires UniWell Entra SAML 2.0 with enforced MFA; the earlier OIDC/delegated-bearer proposal is superseded. The exported demo-server factory, request/response paths and legacy token-resolver construction/resolution reject production use. Four new tests failed before the fixes and pass afterward; two more prove that in-flight provider/identity results cannot escape after an environment change. The focused security suites passed 35 tests. These environment guards prevent accidental reuse and do not implement authentication. Production packaging must exclude both demo and legacy login modules.
 
-`npm audit --omit=dev --json` reported zero known dependency vulnerabilities on November 2, 2026. This is a dependency advisory result, not a penetration test or assurance that the application is vulnerability-free. No SAML library, live MFA policy, production sessions or tenant changes were added. The [SAML security contract](Security-SAML-Access.md) defines required signing/replay checks, session/revocation controls, resource permissions, alternate-host denial and deployed acceptance before private email.
+The [SAML security contract](Security-SAML-Access.md) remains the release requirement. No live MFA policy, tenant change or deployment was made by those guards.
+
+## SAML protocol, session and authorization source — B3 components
+
+The new backend components validate signed AuthnRequests/responses/assertions, require signed MFA evidence and immutable identity, reject XML ambiguity/replay, persist shared session/correlation state, reload current grants and eligibility, enforce CSRF/logout and session deadlines, and provide an HTTPS-only authentication handler. The existing customer UI is not yet attached to this handler. See [SAML Integration](SAML-Integration.md) for exact contracts, limits and composition.
+
+The 100 additional fast tests include 23 genuine-signature protocol tests, 21 HTTP-boundary tests, 18 session tests, 26 principal/loader tests, eight auth-store tests and four composed signed-SAML HTTPS flows. Review identified cookie-contract drift, cross-site prior-session rotation and missing denial-audit coverage; these were fixed and regression-tested. Two independent reviews report no remaining blocker in this source slice.
+
+`npm audit --json` reported zero known vulnerabilities in the installed lockfile; `npm audit signatures` verified 32 registry signatures and one attestation. These are supply-chain/advisory checks, not a penetration test or proof of no vulnerabilities. Exact dependencies and npm version are pinned and installation scripts are disabled. Test signing certificates/keys are generated temporarily and never committed. Production debug logging that could expose SAML-derived content is refused.
+
+The new native PostgreSQL suites contain 15 auth-store scenarios and four principal-loader scenarios in addition to the existing 20 request-store scenarios. They require the explicitly disposable CI service; local scripted/memory tests are not database acceptance. Actual native results belong to the source commit's CI checks. Production roles, directory eligibility synchronization, durable audit sink, key custody, tenant MFA enforcement and real-browser/deployed acceptance remain open.
 
 ## Production work still required
 
-- Exclusive Entra SAML 2.0 with enforced MFA, production session/revocation handling and current database-backed user/evidence authorization; deployed direct-route and forged/replayed-assertion tests.
+- Compose the implemented SAML/session components into the approved production host and authorized workspace; configure actual Entra MFA, directory eligibility and audit persistence; verify real-browser/direct-route/resource-denial behavior.
 - Approved Microsoft tenant credentials, scoped live incoming/sent reads, shared-mailbox coverage and negative access tests.
 - Production PostgreSQL configuration/migration, relational mail-page writer, durable integration jobs and backup/recovery verification.
 - Actual inference provider, reviewed live extraction/correlation, attachment isolation, monitored schedules and coverage warnings.
@@ -47,4 +57,4 @@ npm run check
 npm run build:ticketing-review
 ```
 
-The fast suite uses Node.js 24 built-in SQLite and mocked boundaries. The separate `npm run test:ticketing:postgres` requires an explicit disposable native database; it is not silently skipped when unconfigured. Generated build output, test logs and runtime databases are excluded from Git. See `Production-Readiness.md` for the actual live-pilot go/no-go gates.
+The fast suite uses Node.js 24, OpenSSL for ephemeral fictional test certificates, local HTTPS, built-in SQLite and bounded test doubles. The separate `npm run test:ticketing:postgres` requires an explicit disposable native database; it is not silently skipped when unconfigured. Generated build output, signing material, test logs and runtime databases are excluded from Git. See `Production-Readiness.md` for the actual live-pilot go/no-go gates.

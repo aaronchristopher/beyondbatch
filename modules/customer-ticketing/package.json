@@ -18,6 +18,11 @@
     "demo:durable": "node src/fixtures/durable-server.mjs --demo"
   },
   "dependencies": {
+    "@node-saml/node-saml": "5.2.0",
+    "@xmldom/xmldom": "0.8.15",
     "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "xml-crypto": "6.4.0"
   }
 }

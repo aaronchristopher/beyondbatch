@@ -8,7 +8,7 @@ UniWell employees must enter Customer Ticketing through UniWell Microsoft Entra 
 
 The demo server now refuses `NODE_ENV=production` at factory construction, request entry and response emission. The old delegated-token principal prototype refuses production construction and resolution. Regression tests cover importing the factory, injected providers, attempted override flags and an environment change after construction. These guards prevent accidental reuse; an environment variable is **not** authentication or an internet security boundary. The production image must exclude demo executables, persona datasets and the legacy resolver entirely.
 
-There is no implemented SAML service provider, production session store, MFA policy, live-data web endpoint or verified protected hosting deployment. The existing hosted review is fictional. It must never contain real customer evidence. B2 can be built using isolated fictional database fixtures; B3 and the deployed security tests below must pass before M2 introduces private email.
+The SAML service-provider wrapper, shared PostgreSQL auth store, opaque session manager, current principal resolver and HTTPS authentication handler are now implemented as backend components. Genuine signed test assertions and composed local HTTPS tests verify their behavior; see [SAML Integration](SAML-Integration.md). They are not wired into a production listener or the customer workspace. Entra MFA policy, directory eligibility synchronization, durable audit configuration, live-data endpoints and deployed/browser acceptance remain incomplete. The existing hosted review remains fictional. B3 and the deployed security tests below must pass before M2 introduces private email.
 
 ## Threat model and trust boundaries
 
