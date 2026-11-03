@@ -156,12 +156,13 @@ export function createSamlAuthHandler({manager,publicOrigin,rateLimit,audit,netw
   if(typeof publicOrigin!=='string'||publicOrigin!==origin.origin||origin.protocol!=='https:'||origin.username||origin.password)throw new TypeError('Invalid public origin');
   if(!manager||!['startLogin','finishLogin','authenticate','logout'].every(key=>typeof manager[key]==='function')
       ||typeof rateLimit!=='function'||typeof audit!=='function')throw new TypeError('SAML manager, shared rate limiter and audit sink are required');
-  if(workspace!==undefined&&(!workspace||typeof workspace.workspace!=='function'||typeof workspace.request!=='function')) {
-    throw new TypeError('Saved workspace repository requires workspace and request methods');
+  if(workspace!==undefined&&(!workspace||!['workspace','request','authorize'].every(key=>typeof workspace[key]==='function'))) {
+    throw new TypeError('Saved workspace repository requires workspace, request and authorize methods');
   }
   // Capture only trusted repository methods. No HTTP input selects a provider,
   // tenant, persona, role or database connection.
   const readWorkspace=workspace?.workspace.bind(workspace),readRequest=workspace?.request.bind(workspace);
+  const authorizeRequests=workspace?.authorize.bind(workspace);
   // No callback/default that could silently bypass the required network gate.
   const networkPolicy=createNetworkAccessPolicy(networkAccess);
   return async function samlAuthHandler(req,res) {
@@ -233,12 +234,23 @@ export function createSamlAuthHandler({manager,publicOrigin,rateLimit,audit,netw
         if(!body||typeof body!=='object'||Array.isArray(body))fail(503);
         const serialized=JSON.stringify(body);
         if(Buffer.byteLength(serialized)>1024*1024)fail(503);
+        // Revalidate exactly the resources in the serialized response, avoiding
+        // mutable provider objects or a second toJSON call during final checks.
+        const snapshot=JSON.parse(serialized);
+        const ids=requestMatch?[snapshot.request?.id]:snapshot.requests?.map(row=>row.id);
+        if(!Array.isArray(ids)||ids.length>1000||ids.some(id=>typeof id!=='string'||!REQUEST_ROUTE.test(`/api/requests/${id}`))
+          ||new Set(ids).size!==ids.length||(requestMatch&&ids[0]!==requestMatch[1]))fail(503);
+        Object.freeze(ids);
         await bounded(audit(Object.freeze({type:'workspace.read_prepared',at:new Date().toISOString(),
           route:requestMatch?'/api/requests/:id':'/api/workspace',tenantId:principal.tenantId,principalId:principal.id})));
         // Recheck after repository and audit awaits. An account/grant change
         // must not release a result fetched under the prior authorization.
         const current=sessionProjection(await bounded(manager.authenticate(sessionToken))).principal;
         if(JSON.stringify(current)!==identity)fail(403);
+        // Principal grants alone do not cover backup expiration, cancelled
+        // departmental dependencies or newly restricted evidence. Recheck the
+        // returned IDs against a fresh database authorization snapshot too.
+        if(await bounded(authorizeRequests(current,ids))!==true)fail(403);
         // Snapshot already serialized data before the final async authorization
         // check; avoid invoking a mutable provider object's toJSON again.
         if(!res.destroyed&&!res.writableEnded){res.writeHead(200,{...HEADERS,'Content-Type':'application/json; charset=utf-8'});res.end(serialized);}

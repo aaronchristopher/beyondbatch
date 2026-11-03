@@ -1,6 +1,6 @@
 # Beyond Batch Customer Ticketing — path from demo to live use
 
-Updated November 2, 2026. This extends the same project plan. All code remains in `modules/customer-ticketing/` in `aaronchristopher/beyondbatch`.
+Updated November 3, 2026. This extends the same project plan. All code remains in `modules/customer-ticketing/` in `aaronchristopher/beyondbatch`.
 
 ## Verified starting point
 
@@ -36,6 +36,8 @@ The milestone sequence is a dependency order, not a promise that every stage can
 ## Implementation task index
 
 Detailed acceptance criteria, dependencies and file boundaries are in `todo.md`. **B1: persist one request in PostgreSQL** is complete in a disposable PostgreSQL service, including actual server-restart persistence and native concurrency/permission checks. **B2: read saved work through authorized API projections** follows. B2–B4 complete the signed-in saved-workspace milestone without live mailbox ingestion or model keys.
+
+The agreed initial model-processing allowance is $25 per UTC month. The durable admission component reserves verified maximum costs before dispatch and retains uncertain charges; the model caller and pending-review queue remain to be integrated. Hosting and storage costs are separate. See [AI Cost Control](../docs/AI-Cost-Control.md).
 
 ## Inputs and approvals at the point they are needed
 

@@ -4,16 +4,19 @@ November 3, 2026. Development integration; no live deployment, mailbox permissio
 
 ## Read saved requests
 
-`createPostgresWorkspaceRepository({pool, dbTenantId, clock, maxRequests})` exposes:
+`createPostgresWorkspaceRepository({pool, dbTenantId, clock, maxRequests, readTimeoutMs})` exposes:
 
 - `workspace(principal)`: the existing workspace response shape, backed by saved operational requests.
 - `request(principal, requestId)`: one projected request with version, bounded operational history and active dependencies; `null` for both missing and out-of-scope records.
+- `authorize(principal, requestIds)`: a fresh current-grant and resource-eligibility check for every returned ID, without replaying history. The HTTP boundary requires this method.
 
 The caller's principal must come from the existing verified SAML session. The repository intersects it with current database grants and checks current tenant/account status inside a repeatable-read, read-only transaction. PMs see owned requests or eligible backup assignments; department users need both customer and active dependency-department access; presidents need explicit customer grants. Tenant-wide grants alone do not grant a customer view.
 
 Quarantined/excluded requests, unapproved customers and requests with nonoperational evidence or audit sensitivity do not enter these projections. Lists never include email bodies, attachment contents, mailbox credentials, raw blobs or arbitrary audit payloads. Detail history uses fixed operational event labels. The original source email subject and email trail remain unavailable until the separate authorized-evidence integration exists; no fictional evidence is substituted.
 
 The default workspace limit is 200 requests (trusted configuration may set 1–1,000). Exceeding the limit refuses the read; it does not return an incomplete list with misleading totals. Paginated queries and aggregate counts are a follow-up before larger deployments. Active dependencies are bounded and the earliest promised dependency is the primary row label; detail preserves the other visible dependencies.
+
+Each repository operation has an overall deadline of at most eight seconds, including pool acquisition and queries. Expiration discards an acquired connection, releases a later acquisition and prevents subsequent queries; it does not leave ledger replay running after a timeout response.
 
 ## Use the existing SAML/network boundary
 
@@ -26,7 +29,7 @@ const handler = createSamlAuthHandler({
 });
 ```
 
-The new GET routes are `/api/workspace` and `/api/requests/<lowercase-UUID>`. They accept no query-selected identity, tenant or persona and no writes. Without the repository, they remain unavailable. All requests pass the same TLS/host, approved-network, opaque-session and shared-rate-limit checks. A second session/grant check after repository and audit awaits discards results if authorization changed during the read. Responses are no-store JSON, bounded to 1 MiB, and failures do not disclose source data or database details.
+The new GET routes are `/api/workspace` and `/api/requests/<lowercase-UUID>`. They accept no query-selected identity, tenant or persona and no writes. Without the repository, they remain unavailable. All requests pass the same TLS/host, approved-network, opaque-session and shared-rate-limit checks. After repository and audit awaits, the handler rechecks the session/grants and then checks every returned resource against fresh database eligibility. This includes backup expiration, cancelled department dependencies and restricted evidence. A failed check discards the entire response. Authorization is evaluated at these checks; it cannot retract bytes already sent. Responses are no-store JSON, bounded to 1 MiB, and failures do not disclose source data or database details.
 
 Successful prepared reads produce bounded `workspace.read_prepared` audit events with the fixed route, internal actor/tenant IDs and timestamp. This records a prepared read, not proof that a browser received it. The real durable audit sink is still a deployment requirement.
 

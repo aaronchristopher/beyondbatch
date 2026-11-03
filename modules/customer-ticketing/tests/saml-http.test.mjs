@@ -316,22 +316,24 @@ const requestId='11111111-1111-4111-8111-111111111111';
 const privateHeaders={Cookie:`__Host-bb-session=${sessionToken}`};
 const savedWorkspace={persona:principal,requests:[{id:requestId,subject:'Fictional saved request'}]};
 const savedDetail={request:savedWorkspace.requests[0],version:0,history:[]};
-const repository=()=>({workspace:async()=>savedWorkspace,request:async()=>savedDetail});
+const repository=()=>({workspace:async()=>savedWorkspace,request:async()=>savedDetail,authorize:async()=>true});
 
 test('saved workspace routes use the authenticated principal and recheck it before returning data',async()=>{
-  const seen=[],workspace={workspace:async who=>{seen.push(who);return savedWorkspace;},request:async(who,id)=>{seen.push(who,id);return savedDetail;}};
+  const seen=[],authorized=[],workspace={workspace:async who=>{seen.push(who);return savedWorkspace;},request:async(who,id)=>{seen.push(who,id);return savedDetail;},
+    authorize:async(who,ids)=>{authorized.push([who,ids]);return true;}};
   await harness(async(send,calls)=>{
     for(const [path,expected] of [['/api/workspace',savedWorkspace],[`/api/requests/${requestId}`,savedDetail]]){
       const response=await send({path,headers:privateHeaders});assert.equal(response.status,200,response.body);
       assert.deepEqual(JSON.parse(response.body),expected);assert.equal(response.headers['cache-control'],'no-store');
     }
     assert.deepEqual(seen,[principal,principal,requestId]);assert.equal(calls.authenticate.length,4);
+    assert.deepEqual(authorized,[[principal,[requestId]],[principal,[requestId]]]);
     assert.ok(calls.audit.some(event=>event.type==='workspace.read_prepared'));
   },{workspace});
 });
 
 test('saved data remains inaccessible without a session or outside the approved network',async()=>{
-  let reads=0;const workspace={workspace:async()=>{reads++;return savedWorkspace;},request:async()=>{reads++;return savedDetail;}};
+  let reads=0;const workspace={...repository(),workspace:async()=>{reads++;return savedWorkspace;},request:async()=>{reads++;return savedDetail;}};
   await harness(async send=>{
     assert.equal((await send({path:'/api/workspace'})).status,401);
     assert.equal((await send({path:'/api/workspace',headers:{...privateHeaders,Authorization:'forged'}})).status,403);
@@ -376,6 +378,26 @@ test('saved-data failures, oversized responses and missing mandatory audit fail 
 });
 
 test('invalid workspace composition fails at startup',()=>{
-  for(const workspace of [null,{},()=>{}, {workspace:async()=>({})}])assert.throws(()=>createSamlAuthHandler({
+  for(const workspace of [null,{},()=>{}, {workspace:async()=>({})},{workspace:async()=>savedWorkspace,request:async()=>savedDetail}])assert.throws(()=>createSamlAuthHandler({
     ...dependencies(),publicOrigin,networkAccess:{allowedClientIps:['127.0.0.1']},workspace}),TypeError);
+});
+
+test('resource access revoked during the audit discards saved content despite unchanged session grants',async()=>{
+  let revoked=false,checks=0;
+  await harness(async send=>{
+    const response=await send({path:'/api/workspace',headers:privateHeaders});
+    assert.equal(response.status,403);assert.ok(!response.body.includes('Fictional saved request'));assert.equal(checks,1);
+  },{workspace:{...repository(),authorize:async()=>{checks++;return !revoked;}},
+    audit:async event=>{if(event.type==='workspace.read_prepared')revoked=true;}});
+});
+
+test('resource-check failures and malformed resource identity fail closed',async()=>{
+  for(const [path,workspace] of [['/api/workspace',{...repository(),authorize:async()=>{throw new Error('private database failure');}}],
+    ['/api/workspace',{...repository(),workspace:async()=>({requests:[{id:'wrong',subject:'private'}]})}],
+    [`/api/requests/${requestId}`,{...repository(),request:async()=>({request:{id:'22222222-2222-4222-8222-222222222222'}})}]]){
+    await harness(async send=>{
+      const response=await send({path,headers:privateHeaders});
+      assert.equal(response.status,503);assert.ok(!response.body.includes('private database failure'));
+    },{workspace});
+  }
 });

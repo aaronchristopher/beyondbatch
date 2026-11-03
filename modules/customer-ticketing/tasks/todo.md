@@ -1,4 +1,4 @@
-# Active execution checklist — November 2, 2026
+# Active execution checklist — November 3, 2026
 
 This extends the same project; the completed foundation and previous blockers remain below as history. Milestones and scope are in `plan.md`. No live resources, permission changes or messages are created by this checklist.
 
@@ -9,10 +9,11 @@ This extends the same project; the completed foundation and previous blockers re
 Implementation: `src/persistence/postgres-request-store.mjs`, focused failure tests, native integration suite and restricted-role test harness. No schema constraints were weakened. Production roles, backup/restore and deployment remain release gates.
 
 ## B2 — Read saved work through authorized API projections
-- [ ] Map persisted requests to the existing workspace response shape; do not serialize source bodies into lists.
+- [x] Map persisted requests to the existing workspace response shape; do not serialize source bodies into lists.
 - [ ] Prove PM, department and president customer scopes and revocation using database-backed fixtures.
 - [ ] Verify: API integration tests, direct-ID denial and restart/reload of saved data.
 Dependencies: B1. Scope: M; likely workspace repository, API handler and integration tests.
+Implementation: [Saved Workspace](../docs/Saved-Workspace.md). Native scope and composed signed-SAML/database acceptance require the current CI run; source implementation alone is not a passing deployment gate.
 
 ## B3 — Exclusive SAML 2.0, mandatory MFA and VPN access
 - [x] Implement strict Node-SAML validation, shared PostgreSQL replay/session/limiter storage, current identity/grant/eligibility resolution and HTTPS login/session/logout components. Verify genuine signed assertions and composed fictional HTTPS flows. No production listener or tenant changes. See [SAML Integration](../docs/SAML-Integration.md).
@@ -53,6 +54,12 @@ Dependencies: B4, M1 and approved processing/retention policy. Scope: M; page wr
 - [ ] Surface sync age/errors; implement bounded throttling/retries, missed-event recovery and webhook renewal when enabled.
 - [ ] Verify: lost notification, expired cursor, restart, throttling and stale-sync scenarios without duplicate requests.
 Dependencies: M2. Scope: M; scheduler/coordinator, job adapter, recovery tests and health endpoint.
+
+## A0 — Bound AI processing spend
+- [x] Implement a tenant-isolated durable admission ledger with the agreed $25 monthly model-processing limit, maximum-cost reservations, idempotent dispatch claims and conservative unknown-outcome holds.
+- [ ] Verify native PostgreSQL concurrency, restart/reconnect, UTC rollover, isolation and overrun blocking for the current change.
+- [ ] Wire every paid processing path through the ledger, enforce returned dispatch expiry and verified provider token/tool bounds, and expose pending work when capacity is exhausted.
+Implementation: [AI Cost Control](../docs/AI-Cost-Control.md). No API key, live model, paid call or provider-account spending cap is configured. Hosting, storage and other services are separate costs.
 
 ## A1 — Extract proposed tasks with an approved model
 - [ ] Connect the provider-neutral adapter and label a representative evaluation set; extract separate requests with source references.

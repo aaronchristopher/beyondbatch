@@ -52,6 +52,7 @@ test('native PostgreSQL saved workspace projections',{timeout:90000},async t=>{
     assert.equal(workspace.requests[0].outlookAction.status,'unavailable');
     assert.equal(workspace.requests[0].nextAction,'Review the approved specification');
     const detail=await s.repository.request(s.principal,s.input.id);
+    assert.equal(await s.repository.authorize(s.principal,[s.input.id]),true);
     assert.equal(detail.version,1);assert.deepEqual(detail.history.map(e=>e.type),['request_created','internal_update']);
     assert.equal(detail.emailTrail.status,'unavailable');
     const serialized=JSON.stringify(detail);
@@ -66,6 +67,7 @@ test('native PostgreSQL saved workspace projections',{timeout:90000},async t=>{
     const other={...s.principal,id:s.tenant.actorId};
     assert.equal((await s.repository.workspace(other)).requests.length,0);
     assert.equal(await s.repository.request(other,s.input.id),null);
+    assert.equal(await s.repository.authorize(other,[s.input.id]),false);
     assert.equal(await s.repository.request(other,randomUUID()),null);
   });
 
@@ -77,8 +79,10 @@ test('native PostgreSQL saved workspace projections',{timeout:90000},async t=>{
       VALUES($1,$2,$3,$4,$5,$6,$5,$6,'Fictional backup acceptance')`,
     [s.tenant.tenantId,mappingId,s.tenant.customerId,s.tenant.ownerId,s.tenant.actorId,AT]);
     assert.equal((await s.repository.workspace(backup)).requests.length,1);
+    assert.equal(await s.repository.authorize(backup,[s.input.id]),true);
     await f.admin.query('UPDATE bb.customer_pm_assignments SET effective_until=$1 WHERE tenant_id=$2 AND id=$3',['2026-01-05T09:00:00.000Z',s.tenant.tenantId,mappingId]);
     assert.equal((await s.repository.workspace(backup)).requests.length,0);
+    assert.equal(await s.repository.authorize(backup,[s.input.id]),false);
   });
 
   await t.test('department requires both customer and active department scopes',async()=>{
@@ -89,8 +93,10 @@ test('native PostgreSQL saved workspace projections',{timeout:90000},async t=>{
     await grant(s.tenant,{id:s.tenant.actorId,roleName:'department_member',kind:'department',department:'qa'});
     const detail=await s.repository.request(department,s.input.id);
     assert.equal(detail.request.department,'qa');assert.deepEqual(detail.dependencies.map(d=>d.department),['qa']);
+    assert.equal(await s.repository.authorize(department,[s.input.id]),true);
     await f.admin.query("UPDATE bb.dependencies SET state='cancelled' WHERE tenant_id=$1 AND id=$2",[s.tenant.tenantId,qa]);
     assert.equal(await s.repository.request(department,s.input.id),null);
+    assert.equal(await s.repository.authorize(department,[s.input.id]),false);
   });
 
   await t.test('president sees only explicit customer scope and primary pending department',async()=>{
@@ -105,10 +111,22 @@ test('native PostgreSQL saved workspace projections',{timeout:90000},async t=>{
     assert.equal(await s.repository.request({...president,customerIds:[...president.customerIds,other.tenant.customerId]},other.input.id),null);
   });
 
+  await t.test('unassigned requests remain visibly unassigned in an authorized president view',async()=>{
+    const s=await seed();await grant(s.tenant,{id:s.tenant.actorId,roleName:'president'});
+    const input={...s.input,id:randomUUID(),evidenceId:randomUUID(),ownerId:null};
+    await s.store.createRequest({tenantId:s.tenant.tenantId,idempotencyKey:randomUUID(),input,evidence:{canonicalEmailId:await f.email(s.tenant)}});
+    const workspace=await s.repository.workspace({...s.principal,id:s.tenant.actorId,role:'president'});
+    assert.equal(workspace.summary.unassigned,1);
+    const row=workspace.requests.find(request=>request.id===input.id);
+    assert.equal(row.owner,'Assignment needs review');assert.equal(row.status,'needs_review');
+    assert.equal(row.nextAction,'Next action awaits review');
+  });
+
   await t.test('grant revocation and expiration remove stale session visibility',async()=>{
     const s=await seed();
     await f.admin.query('UPDATE bb.role_grants SET revoked_at=$1 WHERE tenant_id=$2 AND id=$3',['2026-01-05T09:00:00.000Z',s.tenant.tenantId,s.grantId]);
     await assert.rejects(s.repository.workspace(s.principal),error=>error.statusCode===403);
+    assert.equal(await s.repository.authorize(s.principal,[s.input.id]),false);
     await f.admin.query('UPDATE bb.role_grants SET revoked_at=NULL,expires_at=$1 WHERE tenant_id=$2 AND id=$3',[NOW,s.tenant.tenantId,s.grantId]);
     await assert.rejects(s.repository.request(s.principal,s.input.id),error=>error.statusCode===403);
   });
@@ -125,10 +143,34 @@ test('native PostgreSQL saved workspace projections',{timeout:90000},async t=>{
     await f.admin.query("UPDATE bb.requests SET publication_state='excluded' WHERE tenant_id=$1 AND id=$2",[s.tenant.tenantId,s.input.id]);
     assert.equal((await s.repository.workspace(s.principal)).summary.totalOpen,0);
     assert.equal(await s.repository.request(s.principal,s.input.id),null);
+    assert.equal(await s.repository.authorize(s.principal,[s.input.id]),false);
     await f.admin.query("UPDATE bb.requests SET publication_state='approved' WHERE tenant_id=$1 AND id=$2",[s.tenant.tenantId,s.input.id]);
     await f.admin.query("UPDATE bb.canonical_emails SET sensitivity='restricted_legal' WHERE tenant_id=$1 AND id=$2",[s.tenant.tenantId,s.emailId]);
     assert.equal((await s.repository.workspace(s.principal)).summary.totalOpen,0);
     assert.equal(await s.repository.request(s.principal,s.input.id),null);
+    assert.equal(await s.repository.authorize(s.principal,[s.input.id]),false);
+  });
+
+  await t.test('final authorization observes customer eligibility changes and validates all exact IDs',async()=>{
+    const s=await seed();
+    assert.equal(await s.repository.authorize(s.principal,[]),true);
+    assert.equal(await s.repository.authorize(s.principal,[s.input.id,randomUUID()]),false);
+    await f.admin.query("UPDATE bb.customers SET identity_status='inactive' WHERE tenant_id=$1 AND id=$2",[s.tenant.tenantId,s.tenant.customerId]);
+    assert.equal(await s.repository.authorize(s.principal,[s.input.id]),false);
+  });
+
+  await t.test('overall deadline destroys a real stalled query and stops further SQL',async()=>{
+    const s=await seed(),queries=[],releases=[];
+    const pool={async connect(){const client=await f.pool.connect();return {async query(sql,values){
+      queries.push(sql);
+      if(sql.includes('FROM bb.role_grants'))await client.query('SELECT pg_sleep(2)');
+      return client.query(sql,values);
+    },release(error){releases.push(error);client.release(error);}};}};
+    const repo=createPostgresWorkspaceRepository({pool,dbTenantId:s.tenant.tenantId,clock:()=>new Date(NOW),readTimeoutMs:250});
+    await assert.rejects(repo.authorize(s.principal,[s.input.id]),error=>error.code==='WORKSPACE_READ_TIMEOUT');
+    assert.equal(releases.length,1);assert.ok(releases[0] instanceof Error);
+    assert.ok(!queries.some(sql=>sql==='ROLLBACK'||sql.includes('FROM bb.requests r')));
+    assert.equal(await s.repository.authorize(s.principal,[s.input.id]),true);
   });
 
   await t.test('corrupt canonical request data is unavailable, not a stale or invented projection',async()=>{
