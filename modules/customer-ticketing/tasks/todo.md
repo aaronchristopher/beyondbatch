@@ -10,10 +10,10 @@ Implementation: `src/persistence/postgres-request-store.mjs`, focused failure te
 
 ## B2 — Read saved work through authorized API projections
 - [x] Map persisted requests to the existing workspace response shape; do not serialize source bodies into lists.
-- [ ] Prove PM, department and president customer scopes and revocation using database-backed fixtures.
-- [ ] Verify: API integration tests, direct-ID denial and restart/reload of saved data.
+- [x] Prove PM, department and president customer scopes and revocation using database-backed fixtures.
+- [x] Verify: API integration tests, direct-ID denial and restart/reload of saved data.
 Dependencies: B1. Scope: M; likely workspace repository, API handler and integration tests.
-Implementation: [Saved Workspace](../docs/Saved-Workspace.md). Native scope and composed signed-SAML/database acceptance require the current CI run; source implementation alone is not a passing deployment gate.
+Implementation: [Saved Workspace](../docs/Saved-Workspace.md). [CI run 41703962120](https://github.com/aaronchristopher/beyondbatch/actions/runs/41703962120) passed 374 fast tests, 83 native results including 14 workspace scenarios and ten composed signed-SAML/database cases, plus actual database restart verification. This is fictional development acceptance, not a passing deployment gate.
 
 ## B3 — Exclusive SAML 2.0, mandatory MFA and VPN access
 - [x] Implement strict Node-SAML validation, shared PostgreSQL replay/session/limiter storage, current identity/grant/eligibility resolution and HTTPS login/session/logout components. Verify genuine signed assertions and composed fictional HTTPS flows. No production listener or tenant changes. See [SAML Integration](../docs/SAML-Integration.md).
@@ -57,7 +57,7 @@ Dependencies: M2. Scope: M; scheduler/coordinator, job adapter, recovery tests a
 
 ## A0 — Bound AI processing spend
 - [x] Implement a tenant-isolated durable admission ledger with the agreed $25 monthly model-processing limit, maximum-cost reservations, idempotent dispatch claims and conservative unknown-outcome holds.
-- [ ] Verify native PostgreSQL concurrency, restart/reconnect, UTC rollover, isolation and overrun blocking for the current change.
+- [x] Verify native PostgreSQL concurrency, reconnect persistence, UTC rollover, isolation and overrun blocking: all 14 budget scenarios passed in CI run 41703962120.
 - [ ] Wire every paid processing path through the ledger, enforce returned dispatch expiry and verified provider token/tool bounds, and expose pending work when capacity is exhausted.
 Implementation: [AI Cost Control](../docs/AI-Cost-Control.md). No API key, live model, paid call or provider-account spending cap is configured. Hosting, storage and other services are separate costs.
 

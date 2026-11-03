@@ -35,7 +35,7 @@ The milestone sequence is a dependency order, not a promise that every stage can
 
 ## Implementation task index
 
-Detailed acceptance criteria, dependencies and file boundaries are in `todo.md`. **B1: persist one request in PostgreSQL** is complete in a disposable PostgreSQL service, including actual server-restart persistence and native concurrency/permission checks. **B2: read saved work through authorized API projections** follows. B2–B4 complete the signed-in saved-workspace milestone without live mailbox ingestion or model keys.
+Detailed acceptance criteria, dependencies and file boundaries are in `todo.md`. **B1: persist one request in PostgreSQL** and **B2: read saved work through authorized API projections** are complete in disposable native PostgreSQL acceptance, including restart/reload and permission checks. B3 production configuration and B4 browser wiring remain before the signed-in saved-workspace milestone is complete. No live mailbox ingestion or model keys are required for that milestone.
 
 The agreed initial model-processing allowance is $25 per UTC month. The durable admission component reserves verified maximum costs before dispatch and retains uncertain charges; the model caller and pending-review queue remain to be integrated. Hosting and storage costs are separate. See [AI Cost Control](../docs/AI-Cost-Control.md).
 
