@@ -4,6 +4,8 @@ BeyondBatch connects production scheduling, supply readiness, warehouse receivin
 
 ## Product scope
 
+The immediate build has two primary workspaces: **Project Management** (customer requests, accountable owners and response deadlines) and **Supply Chain** (raw-material and packaging purchasing work). They share explicit dependency links so a supplier delay exposes its customer impact. The [connected-workspaces plan](tasks/plan.md), [execution index](tasks/todo.md) and [business glossary](GLOSSARY.md) describe this direction. Supply Chain is planned, not an implemented live ordering system.
+
 Four departments work through connected modules in one application:
 
 - Logistics / Buyers: incoming supply, supplier commitments and schedule shortages.
