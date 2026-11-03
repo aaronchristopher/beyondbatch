@@ -1,6 +1,7 @@
 /**
  * HTTPS-only SAML transport boundary. This does not listen, configure Microsoft,
- * or attach customer-data routes. Compose only with the reviewed SAML manager
+ * by itself. Optional saved-workspace routes use the same mandatory boundary.
+ * Compose only with the reviewed SAML manager
  * and shared limiter; neither may be selected from request input. The network
  * policy is mandatory trusted configuration, independent of SAML identity.
  */
@@ -10,6 +11,7 @@ const MAX_BODY=180*1024, BODY_TIMEOUT_MS=5000, DEPENDENCY_TIMEOUT_MS=10000;
 const CLEAR_SESSION=`${SESSION_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0`;
 const CLEAR_LOGIN=`${LOGIN_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=None; Max-Age=0`;
 const TOKEN=/^[A-Za-z0-9_-]{32,128}$/;
+const REQUEST_ROUTE=/^\/api\/requests\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const REQUIRED_METHODS={
   '/auth/saml/login':'GET', '/auth/saml/acs':'POST',
   '/auth/session':'GET', '/auth/logout':'POST', '/health':'GET',
@@ -149,11 +151,17 @@ function sessionProjection(result) {
     csrfToken:result.csrfToken,expiresAtMs:result.expiresAtMs,reauthAtMs:result.reauthAtMs};
 }
 
-export function createSamlAuthHandler({manager,publicOrigin,rateLimit,audit,networkAccess}={}) {
+export function createSamlAuthHandler({manager,publicOrigin,rateLimit,audit,networkAccess,workspace}={}) {
   let origin;try{origin=new URL(publicOrigin);}catch{throw new TypeError('Invalid public origin');}
   if(typeof publicOrigin!=='string'||publicOrigin!==origin.origin||origin.protocol!=='https:'||origin.username||origin.password)throw new TypeError('Invalid public origin');
   if(!manager||!['startLogin','finishLogin','authenticate','logout'].every(key=>typeof manager[key]==='function')
       ||typeof rateLimit!=='function'||typeof audit!=='function')throw new TypeError('SAML manager, shared rate limiter and audit sink are required');
+  if(workspace!==undefined&&(!workspace||typeof workspace.workspace!=='function'||typeof workspace.request!=='function')) {
+    throw new TypeError('Saved workspace repository requires workspace and request methods');
+  }
+  // Capture only trusted repository methods. No HTTP input selects a provider,
+  // tenant, persona, role or database connection.
+  const readWorkspace=workspace?.workspace.bind(workspace),readRequest=workspace?.request.bind(workspace);
   // No callback/default that could silently bypass the required network gate.
   const networkPolicy=createNetworkAccessPolicy(networkAccess);
   return async function samlAuthHandler(req,res) {
@@ -174,6 +182,12 @@ export function createSamlAuthHandler({manager,publicOrigin,rateLimit,audit,netw
       rejectAlternateIdentity(req);
       if(typeof req.url!=='string'||req.url.length>2048||!req.url.startsWith('/')||req.url.startsWith('//')||req.url.includes('#'))fail(400);
       const url=new URL(req.url,publicOrigin);
+      const requestMatch=readRequest?REQUEST_ROUTE.exec(url.pathname):null;
+      const dataRoute=readWorkspace&&(url.pathname==='/api/workspace'||requestMatch);
+      if(dataRoute) {
+        if(url.search||url.pathname!==req.url)fail(400);
+        if(req.method!=='GET')fail(405);
+      }
       if(Object.hasOwn(REQUIRED_METHODS,url.pathname)) {
         if(url.search||url.pathname!==req.url)fail(400);
         if(req.method!==REQUIRED_METHODS[url.pathname])fail(405);
@@ -210,6 +224,26 @@ export function createSamlAuthHandler({manager,publicOrigin,rateLimit,audit,netw
       }
       const result=await bounded(manager.authenticate(sessionToken));
       if(url.pathname==='/auth/session')return respond(200,sessionProjection(result));
+      if(dataRoute) {
+        const principal=sessionProjection(result).principal;
+        const identity=JSON.stringify(principal);
+        Object.freeze(principal.customerIds);Object.freeze(principal.departmentIds);Object.freeze(principal);
+        const body=await bounded(requestMatch?readRequest(principal,requestMatch[1]):readWorkspace(principal));
+        if(requestMatch&&body===null)fail(404);
+        if(!body||typeof body!=='object'||Array.isArray(body))fail(503);
+        const serialized=JSON.stringify(body);
+        if(Buffer.byteLength(serialized)>1024*1024)fail(503);
+        await bounded(audit(Object.freeze({type:'workspace.read_prepared',at:new Date().toISOString(),
+          route:requestMatch?'/api/requests/:id':'/api/workspace',tenantId:principal.tenantId,principalId:principal.id})));
+        // Recheck after repository and audit awaits. An account/grant change
+        // must not release a result fetched under the prior authorization.
+        const current=sessionProjection(await bounded(manager.authenticate(sessionToken))).principal;
+        if(JSON.stringify(current)!==identity)fail(403);
+        // Snapshot already serialized data before the final async authorization
+        // check; avoid invoking a mutable provider object's toJSON again.
+        if(!res.destroyed&&!res.writableEnded){res.writeHead(200,{...HEADERS,'Content-Type':'application/json; charset=utf-8'});res.end(serialized);}
+        return;
+      }
       fail(404);
     } catch(error) {
       let status=Number.isInteger(error?.statusCode)&&Object.hasOwn(MESSAGES,error.statusCode)?error.statusCode:503;
