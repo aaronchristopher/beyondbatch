@@ -156,9 +156,9 @@ test('saved requests behind signed MFA sessions survive service recreation and e
   await t.test('request sensitivity changed during the awaited read audit suppresses a PM list',async()=>{
     try{
       await rejectsChangedResource(ownerCookie,'/api/workspace',()=>f.admin.query(
-        "UPDATE bb.requests SET sensitivity='restricted_hr' WHERE tenant_id=$1 AND id=$2",[tenant.tenantId,requestId]));
+        "UPDATE bb.requests SET sensitivity='restricted_hr',publication_state='quarantined' WHERE tenant_id=$1 AND id=$2",[tenant.tenantId,requestId]));
     }finally{
-      await f.admin.query("UPDATE bb.requests SET sensitivity='operational' WHERE tenant_id=$1 AND id=$2",[tenant.tenantId,requestId]);
+      await f.admin.query("UPDATE bb.requests SET sensitivity='operational',publication_state='approved' WHERE tenant_id=$1 AND id=$2",[tenant.tenantId,requestId]);
     }
   });
   await t.test('evidence sensitivity changed during the awaited read audit suppresses PM detail',async()=>{
