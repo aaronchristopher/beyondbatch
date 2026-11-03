@@ -152,9 +152,21 @@ export class PostgresRequestStore {
   }
 }
 
+/** Trusted server helper. Caller owns a REPEATABLE READ READ ONLY transaction,
+ * tenant binding and resource authorization; never expose the client to a user.
+ * Reuses the canonical ledger/evidence checks without locks or new transactions.
+ */
+export async function readRequestSnapshot(client, { tenantId, requestId, actorId } = {}) {
+  if (!client || typeof client.query !== 'function') throw new TypeError('transaction client required');
+  uuid(tenantId, 'tenantId'); uuid(requestId, 'requestId'); uuid(actorId, 'actorId');
+  const tx = new RequestTransaction(client, { actorId, actorKind: 'human' }, { readOnly: true });
+  return tx.loadRequest(tenantId, requestId, 'SNAPSHOT');
+}
+
 class RequestTransaction {
-  constructor(client, store) {
+  constructor(client, store, { readOnly = false } = {}) {
     this.client = client; this.store = store; this.tenantId = null;
+    this.readOnly = readOnly;
     this.locked = new Map(); this.staged = new Map(); this.receiptLocks = new Set();
   }
   async bind(tenantId) {
@@ -164,7 +176,7 @@ class RequestTransaction {
     await this.client.query("SELECT set_config('app.tenant_id',$1,true)", [tenantId]);
     const result = await this.client.query(`SELECT p.status,p.principal_type,t.status AS tenant_status
       FROM bb.principals p JOIN bb.tenants t ON t.id=p.tenant_id
-      WHERE p.tenant_id=$1 AND p.id=$2 FOR SHARE OF p,t`, [tenantId, this.store.actorId]);
+      WHERE p.tenant_id=$1 AND p.id=$2${this.readOnly ? '' : ' FOR SHARE OF p,t'}`, [tenantId, this.store.actorId]);
     const actor = result.rows[0];
     if (!actor || actor.status !== 'active' || !['pilot', 'active'].includes(actor.tenant_status)
         || actor.principal_type !== (this.store.actorKind === 'human' ? 'user' : 'service')) {
@@ -192,16 +204,17 @@ class RequestTransaction {
   }
   async loadRequest(tenantId, requestId, mode = 'UPDATE') {
     await this.bind(tenantId); uuid(requestId, 'requestId');
-    if (!['SHARE', 'UPDATE'].includes(mode)) throw new Error('invalid request lock');
+    if (!['SHARE', 'UPDATE'].includes(mode) && !(mode === 'SNAPSHOT' && this.readOnly)) throw new Error('invalid request lock');
     const result = await this.client.query(`SELECT * FROM bb.requests
-      WHERE tenant_id=$1 AND id=$2 FOR ${mode}`, [tenantId, requestId]);
+      WHERE tenant_id=$1 AND id=$2${mode === 'SNAPSHOT' ? '' : ` FOR ${mode}`}`, [tenantId, requestId]);
     const row = result.rows[0];
     if (!row) return null;
     if (row.current_requirements_version !== 1) throw new Error('only requirements version 1 is supported');
     if (row.sensitivity !== 'operational' || row.publication_state !== 'approved') throw new Error('request is not approved operational data');
     const version = safeVersion(row.row_version);
+    if (this.readOnly && version > 1000) throw new Error('request snapshot history limit exceeded');
     const ledger = await this.client.query(`SELECT * FROM bb.audit_events WHERE tenant_id=$1
-      AND aggregate_type='request' AND aggregate_id=$2 ORDER BY aggregate_version`, [tenantId, requestId]);
+      AND aggregate_type='request' AND aggregate_id=$2 ORDER BY aggregate_version${this.readOnly ? ' LIMIT 1002' : ''}`, [tenantId, requestId]);
     if (ledger.rows.length !== version + 1) throw new Error('request audit ledger is incomplete');
     for (let i = 0; i < ledger.rows.length; i++) {
       if (safeVersion(ledger.rows[i].aggregate_version) !== i || ledger.rows[i].request_id !== requestId) {

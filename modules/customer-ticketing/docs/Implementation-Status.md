@@ -1,10 +1,10 @@
-# Customer Ticketing implementation status — November 2, 2026
+# Customer Ticketing implementation status — November 3, 2026
 
 Canonical source: `modules/customer-ticketing/` in `aaronchristopher/beyondbatch`. Customer ticketing is a BeyondBatch module. The source import includes the server, domain, adapters, schema, UI, tests and static review builder.
 
 ## Verified development behavior
 
-The repository-root test run passed **346 tests**, including mandatory network admission, genuine signed SAML, composed HTTPS login/session/logout, authorization/eligibility, six production guards, request workflow and clean-checkout/reproducible-build checks. Source checks passed for 62 JavaScript files and the static review build passed. These are software tests using fictional identities and local or mocked services, not actual tenant sign-in, live VPN routing or real-mail evaluation.
+The repository-root test run passed **374 tests**, including saved-workspace projection/deadline checks, AI budget failure handling, mandatory network admission, genuine signed SAML, composed HTTPS login/session/logout, authorization/eligibility, six production guards, request workflow and clean-checkout/reproducible-build checks. Source checks passed for 69 JavaScript files and the static review build passed. These are software tests using fictional identities and local or mocked services, not actual tenant sign-in, live VPN routing or real-mail evaluation.
 
 The president table shows one row per request with its task and original email subject. Separate movable windows show fictional email threads and a reply composer; email bodies remain outside summary projections. In-app Reply is the primary planned workflow, with Open in Outlook as a secondary action. Drafts and attachment name/size previews stay in session memory, sending remains disabled, and no Microsoft message links are invented. Opening or drafting does not reset a response clock or close a request. Automated checks and a source review passed; browser interaction QA for this UI revision remains unverified because the managed preview browser route refused its connection.
 
@@ -16,7 +16,15 @@ A native PostgreSQL **16.15** CI service passed **20 integration scenarios** (21
 
 A separate local PostgreSQL WASM exercise passed ten sequential adapter checks and file-backed close/reopen. This does not replace the native concurrency checks. A native PostgreSQL service restart also passed on commit `be01fb183f63f4799fe7521a99afaacd92b898b5`: [restart verification run](https://github.com/aaronchristopher/beyondbatch/actions/runs/41527030152). The test proves a changed server start time, compares all saved request/evidence/history/obligation/outbox/receipt rows, and confirms that replaying the original command makes no duplicate writes. Production backup/restore, abrupt-crash recovery and approved deployment roles remain unverified. The fixture uses narrow identity-column UPDATE grants for PostgreSQL row locking; that is an explicit test policy, not a production access-policy approval.
 
-The store is an internal trusted-server component. The website still uses fictional fixtures; database-backed user projections and Microsoft sign-in are the next integration slice. No production database was provisioned. See [PostgreSQL request contract](Postgres-Requests.md).
+The store is an internal trusted-server component. The website still uses fictional fixtures; the new database-backed API composition is described below. Actual Microsoft sign-in and production hosting remain open. No production database was provisioned. See [PostgreSQL request contract](Postgres-Requests.md).
+
+## Saved workspace API and AI cost admission — November 3
+
+The saved workspace/detail repository now feeds the existing response shape through the mandatory SAML/network HTTP boundary. Every read intersects session scopes with current database grants, owner/backup assignments and department dependencies. Restricted requests/evidence are excluded; direct-ID access is denied without disclosing whether the request exists. After the mandatory audit, session and resource authorization are checked again before any prepared content is returned. An overall database-read deadline bounds acquisition and replay; timed-out connections are discarded. See [Saved Workspace](Saved-Workspace.md).
+
+The provider-neutral AI cost ledger defaults to the agreed $25 per UTC month. Concurrent attempts reserve their verified maximum charge before a one-time dispatch claim. Unknown outcomes retain reservations across restarts and month changes; incorrect cost overruns persistently block further spending. The future provider caller must enforce dispatch expiry and the token/tool limits used in the maximum. This component is not connected to a model or scheduler and is not a provider-account spending cap. See [AI Cost Control](AI-Cost-Control.md).
+
+Source review identified and fixed in-flight resource revocation and unbounded total read time; regression coverage includes both. [CI run 41703962120](https://github.com/aaronchristopher/beyondbatch/actions/runs/41703962120) passed on source commit `687dada704a2318bf50a61942f0e64eddcee97be`: **374 fast tests, 83 native PostgreSQL test-runner results (77 scenarios plus six parent cases)**, source checks, a real database restart and the review build. The new native coverage comprises 14 workspace cases, ten composed signed-SAML/database cases and 14 budget cases. The browser continues to use fictional fixtures, production startup remains blocked and no mailbox, model or sending integration is enabled. See [PR 10](https://github.com/aaronchristopher/beyondbatch/pull/10).
 
 ## Exclusive SAML/MFA decision and immediate hardening
 

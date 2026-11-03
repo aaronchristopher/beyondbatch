@@ -35,7 +35,7 @@ async function harness(run,patch={},tls=true) {
   const deps=dependencies(patch);
   // Explicit loopback allowlist is isolated to this local TLS fixture.
   const networkAccess=Object.hasOwn(patch,'networkAccess')?patch.networkAccess:{allowedClientIps:['127.0.0.1']};
-  const handler=createSamlAuthHandler({manager:deps.manager,rateLimit:deps.rateLimit,audit:deps.audit,publicOrigin,networkAccess});
+  const handler=createSamlAuthHandler({manager:deps.manager,rateLimit:deps.rateLimit,audit:deps.audit,publicOrigin,networkAccess,workspace:patch.workspace});
   const server=tls?createHttpsServer({key:fixture.config.spPrivateKey,cert:fixture.config.spCertificate},handler):createHttpServer(handler);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const send=({path='/health',method='GET',headers={},body}={})=>new Promise((resolve,reject)=>{
@@ -311,3 +311,93 @@ test('an unavailable mandatory network-denial audit still denies access without 
   assert.equal(response.headers.location,undefined);assert.equal(response.headers['set-cookie'],undefined);
   assert.equal(calls.authenticate.length,0);assert.equal(calls.rate.length,0);
 },{networkAccess:proxyNetwork(),audit:async()=>{throw new Error('private audit credentials');}}));
+
+const requestId='11111111-1111-4111-8111-111111111111';
+const privateHeaders={Cookie:`__Host-bb-session=${sessionToken}`};
+const savedWorkspace={persona:principal,requests:[{id:requestId,subject:'Fictional saved request'}]};
+const savedDetail={request:savedWorkspace.requests[0],version:0,history:[]};
+const repository=()=>({workspace:async()=>savedWorkspace,request:async()=>savedDetail,authorize:async()=>true});
+
+test('saved workspace routes use the authenticated principal and recheck it before returning data',async()=>{
+  const seen=[],authorized=[],workspace={workspace:async who=>{seen.push(who);return savedWorkspace;},request:async(who,id)=>{seen.push(who,id);return savedDetail;},
+    authorize:async(who,ids)=>{authorized.push([who,ids]);return true;}};
+  await harness(async(send,calls)=>{
+    for(const [path,expected] of [['/api/workspace',savedWorkspace],[`/api/requests/${requestId}`,savedDetail]]){
+      const response=await send({path,headers:privateHeaders});assert.equal(response.status,200,response.body);
+      assert.deepEqual(JSON.parse(response.body),expected);assert.equal(response.headers['cache-control'],'no-store');
+    }
+    assert.deepEqual(seen,[principal,principal,requestId]);assert.equal(calls.authenticate.length,4);
+    assert.deepEqual(authorized,[[principal,[requestId]],[principal,[requestId]]]);
+    assert.ok(calls.audit.some(event=>event.type==='workspace.read_prepared'));
+  },{workspace});
+});
+
+test('saved data remains inaccessible without a session or outside the approved network',async()=>{
+  let reads=0;const workspace={...repository(),workspace:async()=>{reads++;return savedWorkspace;},request:async()=>{reads++;return savedDetail;}};
+  await harness(async send=>{
+    assert.equal((await send({path:'/api/workspace'})).status,401);
+    assert.equal((await send({path:'/api/workspace',headers:{...privateHeaders,Authorization:'forged'}})).status,403);
+  },{workspace});
+  await harness(async send=>{
+    assert.equal((await send({path:'/api/workspace',headers:{...privateHeaders,'X-BB-Client-IP':fictionalOutsideIp}})).status,403);
+  },{workspace,networkAccess:proxyNetwork()});assert.equal(reads,0);
+});
+
+test('workspace endpoints reject persona switches, writes, and noncanonical request paths',async()=>harness(async send=>{
+  for(const path of ['/api/workspace?persona=president',`/api/requests/${requestId}?tenant=other`,'/api/requests/../workspace']){
+    assert.equal((await send({path,headers:privateHeaders})).status,400);
+  }
+  assert.equal((await send({path:'/api/workspace',method:'POST',headers:privateHeaders})).status,405);
+  for(const path of ['/api/requests/not-an-id',`/api/requests/${requestId}/email`,`/api/requests/${requestId}/`]){
+    assert.equal((await send({path,headers:privateHeaders})).status,404);
+  }
+},{workspace:repository()}));
+
+test('missing and denied direct request IDs have the same response',async()=>harness(async send=>{
+  const response=await send({path:`/api/requests/${requestId}`,headers:privateHeaders});
+  assert.equal(response.status,404);assert.deepEqual(JSON.parse(response.body),{error:'Not found'});
+},{workspace:{...repository(),request:async()=>null}}));
+
+test('changed grants during a saved-data read discard the entire response',async()=>{
+  let changed=false;
+  await harness(async send=>{
+    const response=await send({path:'/api/workspace',headers:privateHeaders});
+    assert.equal(response.status,403);assert.ok(!response.body.includes('Fictional saved request'));
+  },{workspace:{...repository(),workspace:async()=>{changed=true;return savedWorkspace;}},manager:{authenticate:async()=>({
+    principal:changed?{...principal,customerIds:[]}:principal,csrfToken,expiresAtMs:2_000_000,reauthAtMs:1_000_000})}});
+});
+
+test('saved-data failures, oversized responses and missing mandatory audit fail closed',async()=>{
+  for(const workspace of [{...repository(),workspace:async()=>{throw new Error('private SQL details');}},
+    {...repository(),workspace:async()=>({value:'x'.repeat(1024*1024)})},{...repository(),workspace:async()=>undefined}]){
+    await harness(async send=>{const response=await send({path:'/api/workspace',headers:privateHeaders});
+      assert.equal(response.status,503);assert.ok(!response.body.includes('private SQL'));},{workspace});
+  }
+  await harness(async send=>{assert.equal((await send({path:'/api/workspace',headers:privateHeaders})).status,503);},
+    {workspace:repository(),audit:async()=>{throw new Error('private audit details');}});
+});
+
+test('invalid workspace composition fails at startup',()=>{
+  for(const workspace of [null,{},()=>{}, {workspace:async()=>({})},{workspace:async()=>savedWorkspace,request:async()=>savedDetail}])assert.throws(()=>createSamlAuthHandler({
+    ...dependencies(),publicOrigin,networkAccess:{allowedClientIps:['127.0.0.1']},workspace}),TypeError);
+});
+
+test('resource access revoked during the audit discards saved content despite unchanged session grants',async()=>{
+  let revoked=false,checks=0;
+  await harness(async send=>{
+    const response=await send({path:'/api/workspace',headers:privateHeaders});
+    assert.equal(response.status,403);assert.ok(!response.body.includes('Fictional saved request'));assert.equal(checks,1);
+  },{workspace:{...repository(),authorize:async()=>{checks++;return !revoked;}},
+    audit:async event=>{if(event.type==='workspace.read_prepared')revoked=true;}});
+});
+
+test('resource-check failures and malformed resource identity fail closed',async()=>{
+  for(const [path,workspace] of [['/api/workspace',{...repository(),authorize:async()=>{throw new Error('private database failure');}}],
+    ['/api/workspace',{...repository(),workspace:async()=>({requests:[{id:'wrong',subject:'private'}]})}],
+    [`/api/requests/${requestId}`,{...repository(),request:async()=>({request:{id:'22222222-2222-4222-8222-222222222222'}})}]]){
+    await harness(async send=>{
+      const response=await send({path,headers:privateHeaders});
+      assert.equal(response.status,503);assert.ok(!response.body.includes('private database failure'));
+    },{workspace});
+  }
+});
