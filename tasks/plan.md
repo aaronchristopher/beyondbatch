@@ -1,6 +1,6 @@
 # BeyondBatch: Project Management and Supply Chain
 
-Date: November 3, 2026.
+Date: November 5, 2026.
 Status: implementation direction and ordered backlog; Supply Chain is not yet implemented or connected to live orders.
 
 ## Outcome
@@ -10,7 +10,7 @@ Build two primary workspaces in the existing BeyondBatch application:
 | Workspace | Daily question | First useful experience |
 |---|---|---|
 | Project Management | What does each customer need, who owes the next action, and when must we respond? | My Tasks, customer requests, department dependencies, email evidence and the 24-hour response clock |
-| Supply Chain | What must we buy, what is on order, and what is preventing availability? | Raw Materials and Packaging views of purchasing lines, buyer actions, supplier promises, partial receipts and quality blockers |
+| Supply Chain | Which materials and packaging components will be ready when each operation needs them? | Raw Materials and Packaging checklists per production run, with shortages, ETAs, affected shifts and buyer follow-up |
 
 The president receives a combined operational view of customer impact, overdue answers and supply blockers. The two workspaces are navigation over connected business records. They preserve the existing Buyer, Warehouse, QA/QC and Operations workflows and the spreadsheet/shift schedule described in `docs/`.
 
@@ -28,7 +28,19 @@ Keep one row per customer request: customer, specific task/original subject, acc
 
 ### Supply Chain
 
-Use one purchasing-line model with Raw Materials and Packaging filters. Each row shows component code/description/revision, supplier, supplier PO and line, buyer, ordered/received/remaining quantity and unit, requested and confirmed dates, next delivery, quality status, affected demand and next action. Open the line in a window with its deliveries, promise history, receipts, documents and linked PM requests.
+Open **Raw Materials** from a scheduled production run. Show the FG, WO/run, planned quantity, applicable BOM revision and material need-by time. Build the checklist from all raw requirements for that operation. A raw stays visible when it is already covered, when no PO exists, and when a supplier has yet to confirm a date.
+
+Each row shows the RM code/name, quantity required for the run, eligible quantity available to that run, shortage and unit, plus expected dock arrival date(s) and quantities for its allocated incoming supply. A buyer can open the supporting supplier PO lines, latest dated evidence and prior commitments. For split deliveries, show when enough is expected to arrive to cover the balance. If only part has a confirmed date, show the known installment and mark the remaining quantity's ETA unknown. Show received stock awaiting QA separately. Compare expected usable dates against the operation's need-by time when release timing is known.
+
+The Raw Materials agent monitors approved supplier correspondence for PO-line delivery updates. Match the supplier, item, PO line and installment, distinguish shipping from arrival, and preserve the source and date of each update. A reviewed change updates every run relying on that delivery according to its allocated quantity. Ambiguous matches require buyer review. The run checklist exists independently of email.
+
+Open **Packaging** from the same candidate or scheduled run. List every PK component required by the applicable WO/BOM and pack configuration, grouped by the operation that consumes it. For each component show the PK code, required revision, quantity and unit needed, usable quantity allocated to the run, balance, need-by shift, incoming amounts with dock ETAs, and expected usable time when supported. Include components supplied from stock, with no PO, or with no confirmed ETA. Mark a missing or unverified requirements list as unknown.
+
+On the schedule, show the pending components for each operation and the quantity each is short. Distinguish ready now, expected by the shift, late, and timing unknown. A component is ready only when the correct revision and enough released stock are available to that operation. Apply a shortage to the consuming step and its dependencies. For example, a delayed shipper can put final packout at risk while an independently ready filling step proceeds. The scheduler decides whether to move or split a run.
+
+The Packaging agent matches supplier delivery evidence to the PK item, revision and PO installment. A reviewed change refreshes the affected shifts. Selecting a pending component opens its PO line, expected deliveries, latest dated evidence and follow-up owner. Quote and RFQ handling sit outside this scheduling view.
+
+Use one purchasing-line model to support both run checklists. Each purchasing line shows component code/description/revision, supplier, supplier PO and line, buyer, ordered/received/remaining quantity and unit, requested and confirmed dates, next delivery, quality status, affected demand and next action. Open the line in a window with its deliveries, promise history, receipts, documents and linked PM requests.
 
 Raw-material prerequisites include applicable material specification and supplier approval. Packaging prerequisites include the exact approved specification/artwork revision and pack configuration. Required approvals are verified evidence, not inferred from an email saying “looks good.”
 
@@ -66,7 +78,7 @@ Priority starts with missed customer obligations, known shortages and latest saf
 ## Delivery order
 
 1. Finish the existing saved, authenticated PM workspace (B2–B4), maintaining SAML/MFA, approved-network and per-resource authorization.
-2. Build the Supply Chain order register with one fictional RM line and one fictional PK line, then add durable persistence and a reviewed import path.
+2. Build one fictional production run with complete Raw Materials and Packaging checklists, component ETAs and blockers by consuming operation. Back both with verified run requirements, allocated stock and purchasing lines, then add persistence and a reviewed import path.
 3. Link a delayed purchasing line to a customer request and show buyer action, PM response obligation and president impact together.
 4. Add reviewed incoming/sent email updates and customer task classification; bring supplier updates in through explicit authorized mailbox coverage.
 5. Add internal purchase-request drafting and, after inventory/BOM/allocation validation, evidenced suggestions for what and when to buy.
@@ -76,6 +88,6 @@ The implementation tasks are in [todo.md](todo.md). Each slice has its own proof
 
 ## Inputs needed at their implementation boundary
 
-Confirm one representative raw-material and packaging open-PO export, its field meanings, stable line IDs and as-of time. Confirm buyer ownership, official approval/release authorities and which system issues POs before enabling commercial writes. Use existing authorized exports when available; direct connectors are optional until verified. No private operational data or deployment settings belong in this public repository.
+Confirm one representative production run, its work-order requirements or applicable BOM revision, packaging configuration, planned quantity and operation/shift need-by times, stock/allocation status and corresponding raw-material and packaging open-PO lines. Verify units, external IDs, date meanings and snapshot times. Confirm buyer ownership, official approval/release authorities and which system issues POs before enabling commercial writes. Use existing authorized exports when available; direct connectors are optional until verified. No private operational data or deployment settings belong in this public repository.
 
 Actual domain/hosting, directory eligibility, durable audit and deployed VPN/SAML acceptance remain the existing security release gates. New supply-chain permissions must be defined explicitly; a PM or president role does not silently acquire purchasing or quality-release authority.
