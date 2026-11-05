@@ -1,6 +1,6 @@
 # Connected workspaces execution index
 
-November 3, 2026. Root tasks coordinate the existing PM module and new Supply Chain work. PM implementation details remain in [the existing checklist](../modules/customer-ticketing/tasks/todo.md). No live deployment, permissions, purchase orders or messages are changed by this backlog.
+November 5, 2026. Root tasks coordinate the existing PM module and new Supply Chain work. PM implementation details remain in [the existing checklist](../modules/customer-ticketing/tasks/todo.md). No live deployment, permissions, purchase orders or messages are changed by this backlog.
 
 ## PM checkpoint — saved, authenticated workspace
 
@@ -12,9 +12,10 @@ Verification: use the existing B2–B4 verification and production-readiness gat
 
 ## S1 — Purchasing-line model and fictional examples
 
-Create the domain contract for RM and PK purchasing lines with distinct external references, units, revisions, buyer and source freshness.
+Define a run's raw requirements and the RM and PK purchasing lines supplying demand. Keep the run/WO, FG, BOM revision, units, need-by time, buyer and source freshness explicit.
 
-- [ ] Represent one RM and one PK line with split deliveries; distinguish customer PO from supplier PO.
+- [ ] Build a fictional run with raws covered by allocated released stock, incoming in installments, received awaiting QA, and short with no PO. Include an independent PK purchasing line.
+- [ ] Link each requirement to quantities from stock or specific PO installments, allowing several sources per raw and several runs per PO without double allocation.
 - [ ] Validate quantities, units and required identities; unknown dates/revisions stay explicit.
 - [ ] Define corrections/cancellations and enforce no implicit quality release or financial authorization.
 
@@ -24,7 +25,7 @@ Verification: focused domain tests for partial quantities, invalid identities, s
 
 Persist the line, deliveries, evidence and revision events atomically using module-owned PostgreSQL tables.
 
-- [ ] Save/reload both types and preserve before/after changes with actor and evidence.
+- [ ] Save/reload the run, its full raw requirements and supply allocations alongside both purchasing-line types. Preserve before/after changes with actor and evidence.
 - [ ] Replaying an import or command creates no duplicate line, receipt quantity or event.
 - [ ] Tenant isolation, concurrent edits and failed writes deny or roll back coherently.
 
@@ -32,7 +33,9 @@ Verification: disposable native PostgreSQL integration tests, including reconnec
 
 ## S3 — Authorized order register
 
-Expose saved purchasing lines in Raw Materials and Packaging views with an order-detail window.
+Open a run in Raw Materials to display every required raw and its ETA. Keep the Packaging order register and allow drill-down to supporting purchasing lines from both views.
+
+- [ ] Show required, usable for this run, remaining short, incoming quantities and dock ETAs by installment. Show the date enough is expected, an unknown ETA for any uncovered balance, and QA status against the run's need-by time. A missing PO never drops a raw from the list.
 
 - [ ] Rows show supplier/buyer, component/revision, open quantity/unit, confirmed date, next action and freshness.
 - [ ] List/detail queries enforce approved buyer and linked-customer visibility without leaking supplier commercial terms or email bodies to unrelated users.
@@ -42,7 +45,7 @@ Verification: scoped API tests and browser acceptance with fictional users. Depe
 
 ## Checkpoint — reliable purchasing visibility
 
-- [ ] Show one RM and one PK order through refresh and restart, with correct access and clear unavailable/stale states.
+- [ ] Open a fictional WO and see its complete raw list through refresh and restart. Demonstrate a split delivery, a raw with no ETA and a receipt awaiting QA. Open a PK order separately.
 - [ ] Review the line fields and daily buyer workflow before adding bulk imports or automation.
 
 ## S4 — Reviewed open-PO import
@@ -59,7 +62,7 @@ Verification: fixtures for duplicate snapshots, changed quantities, missing line
 
 Record reviewed promise revisions and quantity-scoped receiving progress without conflating them with inventory eligibility.
 
-- [ ] Preserve original/latest supplier commitments and separate ship, dock-arrival and available-by dates.
+- [ ] Preserve original/latest supplier commitments and separate ship, dock-arrival and available-by dates. A reviewed supplier email moving one installment must update the relevant raw ETAs for the affected runs while preserving unaffected dates and quantities.
 - [ ] Partial receipts reduce only the correct delivery/line balance; corrections and returns remain auditable.
 - [ ] ERP posting and authorized lot/quantity disposition stay separate; pending/held stock never becomes usable by receipt alone.
 - [ ] Applicable receipts create or link an owned Warehouse-to-QA handoff with requested/acknowledged/completed times; repeated events do not duplicate work. Before full QA queues exist, show the designated quality case and owner.
