@@ -1,5 +1,7 @@
 # BeyondBatch
 
+[Shared suite architecture](docs/SUITE-ARCHITECTURE.md) shows how the four private products share one API and database per customer.
+
 BeyondBatch connects production scheduling, supply readiness, warehouse receiving, quality release, delivery risk and customer requests.
 
 ## Product scope
